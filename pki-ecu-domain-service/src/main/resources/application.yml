@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: pki-ecu-domain-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pki_platform
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    schemas: pki_ecu
+    default-schema: pki_ecu
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 18083
+
+logging:
+  level:
+    root: INFO
+    com.pki.platform: INFO
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.pki.platform.ecudomain.model
+  configuration:
+    map-underscore-to-camel-case: true

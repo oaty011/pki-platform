@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: pki-app-domain-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pki_platform
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    schemas: pki_app
+    default-schema: pki_app
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 18082
+
+logging:
+  level:
+    root: INFO
+    com.pki.platform: INFO
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.pki.platform.appdomain.model
+  configuration:
+    map-underscore-to-camel-case: true

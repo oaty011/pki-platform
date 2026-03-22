@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pki.platform.revocation.mapper.CertificateIssueFactMapper">
+
+    <resultMap id="certificateIssueFactResultMap" type="com.pki.platform.revocation.model.CertificateIssueFact">
+        <id column="cert_serial" property="certSerial" />
+        <id column="issuer_id" property="issuerId" />
+        <result column="subject_id" property="subjectId" />
+        <result column="not_after" property="notAfter" />
+        <result column="organization" property="organization" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <select id="selectByCertSerialAndIssuerId" resultMap="certificateIssueFactResultMap">
+        SELECT cert_serial, issuer_id, subject_id, not_after, organization, created_at, updated_at
+        FROM pki_issuance.certificate_issue_fact
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+        ORDER BY created_at DESC
+        LIMIT 1
+    </select>
+</mapper>

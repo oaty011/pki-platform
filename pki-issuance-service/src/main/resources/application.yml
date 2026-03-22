@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: pki-issuance-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pki_platform
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    schemas: pki_issuance
+    default-schema: pki_issuance
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+server:
+  port: 18081
+
+logging:
+  level:
+    root: INFO
+    com.pki.platform: INFO
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.pki.platform.issuance.model
+  configuration:
+    map-underscore-to-camel-case: true

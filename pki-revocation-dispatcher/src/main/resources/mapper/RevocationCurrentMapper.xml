@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pki.platform.revocation.mapper.RevocationCurrentMapper">
+
+    <resultMap id="revocationCurrentResultMap" type="com.pki.platform.revocation.model.RevocationCurrent">
+        <id column="cert_serial" property="certSerial" />
+        <result column="issuer_id" property="issuerId" />
+        <result column="revoked_at" property="revokedAt" />
+        <result column="reason" property="reason" />
+        <result column="first_activated_at" property="firstActivatedAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.pki.platform.revocation.model.RevocationCurrent">
+        INSERT INTO pki_revocation.revocation_current (
+            cert_serial, issuer_id, revoked_at, reason, first_activated_at, updated_at
+        ) VALUES (
+            #{certSerial}, #{issuerId}, #{revokedAt}, #{reason}, #{firstActivatedAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectByCertSerialAndIssuerId" resultMap="revocationCurrentResultMap">
+        SELECT cert_serial, issuer_id, revoked_at, reason, first_activated_at, updated_at
+        FROM pki_revocation.revocation_current
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+    </select>
+
+    <delete id="deleteByCertSerialAndIssuerId">
+        DELETE FROM pki_revocation.revocation_current
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+    </delete>
+</mapper>

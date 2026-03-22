@@ -1,0 +1,3 @@
+spring:
+  application:
+    name: pki-app-domain-service

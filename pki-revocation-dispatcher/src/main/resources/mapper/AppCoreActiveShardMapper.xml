@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pki.platform.revocation.mapper.AppCoreActiveShardMapper">
+
+    <resultMap id="coreActiveRecordResultMap" type="com.pki.platform.revocation.model.CoreActiveRecord">
+        <id column="cert_serial" property="certSerial" />
+        <id column="issuer_id" property="issuerId" />
+        <result column="subject_id" property="subjectId" />
+        <result column="is_current" property="current" />
+        <result column="not_after" property="notAfter" />
+        <result column="first_activated_at" property="firstActivatedAt" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <select id="selectByCertSerialAndIssuerIdFromShard" resultMap="coreActiveRecordResultMap">
+        SELECT cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+        FROM pki_app.${tableName}
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+    </select>
+
+    <delete id="deleteByCertSerialAndIssuerIdFromShard">
+        DELETE FROM pki_app.${tableName}
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+    </delete>
+
+    <insert id="upsertToShard">
+        INSERT INTO pki_app.${tableName} (
+            cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+        ) VALUES (
+            #{record.certSerial}, #{record.issuerId}, #{record.subjectId}, #{record.current}, #{record.notAfter}, #{record.firstActivatedAt}, #{record.createdAt}, #{record.updatedAt}
+        )
+        ON CONFLICT (cert_serial, issuer_id) DO UPDATE
+        SET subject_id = EXCLUDED.subject_id,
+            is_current = EXCLUDED.is_current,
+            not_after = EXCLUDED.not_after,
+            first_activated_at = COALESCE(pki_app.${tableName}.first_activated_at, EXCLUDED.first_activated_at),
+            updated_at = EXCLUDED.updated_at
+    </insert>
+</mapper>

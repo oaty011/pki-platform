@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pki.platform.revocation.mapper.RevocationOutboxMapper">
+
+    <resultMap id="revocationOutboxResultMap" type="com.pki.platform.revocation.model.RevocationOutbox">
+        <id column="id" property="id" />
+        <result column="cert_serial" property="certSerial" />
+        <result column="issuer_id" property="issuerId" />
+        <result column="event_type" property="eventType" />
+        <result column="status" property="status" />
+        <result column="version" property="version" />
+        <result column="retry_count" property="retryCount" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <insert id="insert" parameterType="com.pki.platform.revocation.model.RevocationOutbox" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO pki_revocation.revocation_outbox (
+            cert_serial, issuer_id, event_type, status, version, retry_count, created_at, updated_at
+        ) VALUES (
+            #{certSerial}, #{issuerId}, #{eventType}, #{status}, #{version}, #{retryCount}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectMaxVersionByCertSerialAndIssuerId" resultType="java.lang.Long">
+        SELECT MAX(version)
+        FROM pki_revocation.revocation_outbox
+        WHERE cert_serial = #{certSerial}
+          AND issuer_id = #{issuerId}
+    </select>
+</mapper>

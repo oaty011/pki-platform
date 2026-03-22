@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.pki.platform.issuance.mapper.CertificateIssueFactMapper">
+
+    <resultMap id="certificateIssueFactResultMap" type="com.pki.platform.issuance.model.CertificateIssueFact">
+        <id column="id" property="id" />
+        <result column="request_id" property="requestId" />
+        <result column="template_id" property="templateId" />
+        <result column="subject_id" property="subjectId" />
+        <result column="organization" property="organization" />
+        <result column="issuer_id" property="issuerId" />
+        <result column="signer_id" property="signerId" />
+        <result column="cert_serial" property="certSerial" />
+        <result column="certificate_pem" property="certificatePem" />
+        <result column="not_after" property="notAfter" />
+        <result column="status" property="status" />
+        <result column="sync_status" property="syncStatus" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <sql id="issueFactColumns">
+        id, request_id, template_id, subject_id, organization, issuer_id, signer_id, cert_serial, certificate_pem, not_after, status, sync_status, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.pki.platform.issuance.model.CertificateIssueFact" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO pki_issuance.certificate_issue_fact (
+            request_id, template_id, subject_id, organization, issuer_id, signer_id, cert_serial, certificate_pem, not_after, status, sync_status, created_at, updated_at
+        ) VALUES (
+            #{requestId}, #{templateId}, #{subjectId}, #{organization}, #{issuerId}, #{signerId}, #{certSerial}, #{certificatePem}, #{notAfter}, #{status}, #{syncStatus}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="certificateIssueFactResultMap">
+        SELECT <include refid="issueFactColumns" />
+        FROM pki_issuance.certificate_issue_fact
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByRequestId" resultMap="certificateIssueFactResultMap">
+        SELECT <include refid="issueFactColumns" />
+        FROM pki_issuance.certificate_issue_fact
+        WHERE request_id = #{requestId}
+    </select>
+
+    <select id="countBySubjectIdAndOrganization" resultType="int">
+        SELECT COUNT(*)
+        FROM pki_issuance.certificate_issue_fact
+        WHERE subject_id = #{subjectId}
+          AND organization = #{organization}
+    </select>
+
+    <select id="selectLatestBySubjectIdAndOrganization" resultMap="certificateIssueFactResultMap">
+        SELECT <include refid="issueFactColumns" />
+        FROM pki_issuance.certificate_issue_fact
+        WHERE subject_id = #{subjectId}
+          AND organization = #{organization}
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectBySubjectIdAndOrganizationAndCertSerial" resultMap="certificateIssueFactResultMap">
+        SELECT <include refid="issueFactColumns" />
+        FROM pki_issuance.certificate_issue_fact
+        WHERE subject_id = #{subjectId}
+          AND organization = #{organization}
+          AND cert_serial = #{certSerial}
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectByRequestIdAndStatus" resultMap="certificateIssueFactResultMap">
+        SELECT <include refid="issueFactColumns" />
+        FROM pki_issuance.certificate_issue_fact
+        WHERE request_id = #{requestId}
+          AND status = #{status}
+          AND sync_status = #{syncStatus}
+    </select>
+
+    <update id="updateSyncStatusByRequestId">
+        UPDATE pki_issuance.certificate_issue_fact
+        SET sync_status = #{syncStatus},
+            updated_at = #{updatedAt}
+        WHERE request_id = #{requestId}
+    </update>
+</mapper>

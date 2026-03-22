@@ -1,0 +1,5 @@
+ALTER TABLE pki_revocation.revocation_outbox
+    ADD COLUMN IF NOT EXISTS issuer_id VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS version BIGINT,
+    ADD COLUMN IF NOT EXISTS retry_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
