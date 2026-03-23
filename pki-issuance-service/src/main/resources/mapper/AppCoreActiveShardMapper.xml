@@ -43,7 +43,6 @@
         FROM pki_app.${tableName}
         WHERE cert_serial = #{certSerial}
         ORDER BY updated_at DESC
-        LIMIT 1
     </select>
 
     <update id="markCurrentFalseBySubjectIdInShard">

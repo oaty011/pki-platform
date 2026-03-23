@@ -13,10 +13,8 @@ public class MockSignerService {
         String certSerial = UUID.randomUUID().toString().replace("-", "");
         String issuerId = "mock-issuer-001";
         String signerId = "mock-signer-001";
-        String certificatePem = "-----BEGIN CERTIFICATE-----
-"
-            + subjectId + ":" + templateId + ":" + certSerial + "
-"
+        String certificatePem = "-----BEGIN CERTIFICATE-----\n"
+            + subjectId + ":" + templateId + ":" + certSerial + "\n"
             + "-----END CERTIFICATE-----";
         return new MockSignResult(certSerial, issuerId, signerId, certificatePem, notAfter);
     }

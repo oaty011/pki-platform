@@ -55,12 +55,12 @@ public class CertificateController {
     }
 
     @GetMapping("/app-certificates/current/{subjectId}")
-    public ApiResponse<CurrentCertificateResponse> getCurrentApp(@PathVariable String subjectId) {
+    public ApiResponse<CurrentCertificateResponse> getCurrentApp(@PathVariable("subjectId") String subjectId) {
         return ApiResponse.success(certificateCurrentQueryService.getCurrentAppCertificate(subjectId));
     }
 
     @GetMapping("/ecu-certificates/current/{subjectId}")
-    public ApiResponse<CurrentCertificateResponse> getCurrentEcu(@PathVariable String subjectId) {
+    public ApiResponse<CurrentCertificateResponse> getCurrentEcu(@PathVariable("subjectId") String subjectId) {
         return ApiResponse.success(certificateCurrentQueryService.getCurrentEcuCertificate(subjectId));
     }
 
@@ -75,17 +75,17 @@ public class CertificateController {
     }
 
     @GetMapping("/certificates/{requestId}")
-    public ApiResponse<CertificateStatusResponse> getStatus(@PathVariable String requestId) {
+    public ApiResponse<CertificateStatusResponse> getStatus(@PathVariable("requestId") String requestId) {
         return ApiResponse.success(certificateQueryService.getStatus(requestId));
     }
 
     @GetMapping("/certificates/{requestId}/certificate")
-    public ApiResponse<CertificateContentResponse> getCertificate(@PathVariable String requestId) {
+    public ApiResponse<CertificateContentResponse> getCertificate(@PathVariable("requestId") String requestId) {
         return ApiResponse.success(certificateQueryService.getCertificate(requestId));
     }
 
     @PostMapping("/certificates/sync-core-active/{requestId}")
-    public ApiResponse<Map<String, String>> syncCoreActive(@PathVariable String requestId) {
+    public ApiResponse<Map<String, String>> syncCoreActive(@PathVariable("requestId") String requestId) {
         CoreActiveSyncService.SyncCoreActiveResult result = coreActiveSyncService.syncCoreActive(requestId);
         return ApiResponse.success(Map.of(
             "requestId", result.getRequestId(),

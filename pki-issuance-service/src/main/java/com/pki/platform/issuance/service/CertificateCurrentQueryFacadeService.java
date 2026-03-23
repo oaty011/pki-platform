@@ -11,6 +11,9 @@ import com.pki.platform.issuance.mapper.CertificateIssueFactMapper;
 import com.pki.platform.issuance.mapper.EcuCoreActiveShardMapper;
 import com.pki.platform.issuance.model.CertificateIssueFact;
 import com.pki.platform.issuance.model.CoreActiveRecord;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -82,15 +85,18 @@ public class CertificateCurrentQueryFacadeService {
             return response;
         }
 
-        CoreActiveRecord coreActiveRecord = appDomain
+        List<CoreActiveRecord> coreActiveRecords = appDomain
             ? appCoreActiveShardMapper.selectByCertSerialFromShard(tableName, certSerial)
             : ecuCoreActiveShardMapper.selectByCertSerialFromShard(tableName, certSerial);
-        if (coreActiveRecord != null) {
-            response.setCertificate(toCoreActiveItem(coreActiveRecord));
-            return response;
+        if (coreActiveRecords != null && !coreActiveRecords.isEmpty()) {
+            List<CertificateQueryItemResponse> matchedCoreActive = toCoreActiveItems(coreActiveRecords, subjectId);
+            if (!matchedCoreActive.isEmpty()) {
+                response.setMatchedCertificates(matchedCoreActive);
+                return response;
+            }
         }
 
-        response.setCertificate(toIssueFactItem(
+        response.setMatchedCertificates(toIssueFactItems(
             certificateIssueFactMapper.selectBySubjectIdAndOrganizationAndCertSerial(subjectId, organization, certSerial)
         ));
         return response;
@@ -120,6 +126,25 @@ public class CertificateCurrentQueryFacadeService {
         item.setFirstActivatedAt(record.getFirstActivatedAt());
         item.setIsCurrent(record.getCurrent());
         return item;
+    }
+
+    private List<CertificateQueryItemResponse> toIssueFactItems(List<CertificateIssueFact> records) {
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return records.stream()
+            .map(this::toIssueFactItem)
+            .collect(Collectors.toList());
+    }
+
+    private List<CertificateQueryItemResponse> toCoreActiveItems(List<CoreActiveRecord> records, String subjectId) {
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return records.stream()
+            .filter(record -> subjectId.equals(record.getSubjectId()))
+            .map(this::toCoreActiveItem)
+            .collect(Collectors.toList());
     }
 
     private String normalize(String value) {

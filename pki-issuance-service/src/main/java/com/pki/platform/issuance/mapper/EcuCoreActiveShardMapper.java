@@ -1,6 +1,7 @@
 package com.pki.platform.issuance.mapper;
 
 import com.pki.platform.issuance.model.CoreActiveRecord;
+import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface EcuCoreActiveShardMapper {
@@ -15,8 +16,8 @@ public interface EcuCoreActiveShardMapper {
     CoreActiveRecord selectCurrentBySubjectIdFromShard(@Param("tableName") String tableName,
                                                        @Param("subjectId") String subjectId);
 
-    CoreActiveRecord selectByCertSerialFromShard(@Param("tableName") String tableName,
-                                                 @Param("certSerial") String certSerial);
+    List<CoreActiveRecord> selectByCertSerialFromShard(@Param("tableName") String tableName,
+                                                       @Param("certSerial") String certSerial);
 
     int markCurrentFalseBySubjectIdInShard(@Param("tableName") String tableName,
                                            @Param("subjectId") String subjectId,

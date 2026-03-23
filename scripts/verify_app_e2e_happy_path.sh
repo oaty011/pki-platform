@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:18081}"
+REVOCATION_BASE_URL="${REVOCATION_BASE_URL:-http://localhost:18084}"
 PGHOST="${PGHOST:?PGHOST is required}"
 PGPORT="${PGPORT:-5432}"
 PGDATABASE="${PGDATABASE:?PGDATABASE is required}"
@@ -23,7 +24,7 @@ require_cmd() {
 
 json_get() {
   local path="$1"
-  python3 - "$path" <<'PY'
+  python3 -c '
 import json
 import sys
 
@@ -43,7 +44,7 @@ elif isinstance(cur, bool):
     print("true" if cur else "false")
 else:
     print(cur)
-PY
+' "$path"
 }
 
 sql_escape() {
@@ -115,6 +116,7 @@ require_cmd python3
 
 cat <<MSG
 BASE_URL=${BASE_URL}
+REVOCATION_BASE_URL=${REVOCATION_BASE_URL}
 PGHOST=${PGHOST}
 PGPORT=${PGPORT}
 PGDATABASE=${PGDATABASE}
@@ -150,7 +152,7 @@ echo "== 3) Sync core_active =="
 SYNC_RESPONSE="$(api_post "${BASE_URL}/certificates/sync-core-active/${REQUEST_ID}" '{}')"
 printf '%s\n' "$SYNC_RESPONSE"
 assert_api_success "$SYNC_RESPONSE" "sync-core-active"
-assert_equals "DONE" "$(printf '%s' "$SYNC_RESPONSE" | json_get "data.syncStatus")" "sync status mismatch"
+assert_equals "done" "$(printf '%s' "$SYNC_RESPONSE" | json_get "data.syncStatus")" "sync status mismatch"
 
 echo
 echo "== 4) First APP current query =="
@@ -178,7 +180,7 @@ assert_non_empty "$CORE_ACTIVE_NOT_AFTER_AFTER_SYNC" "core_active not_after is e
 
 echo
 echo "== 6) APP revoke =="
-REVOKE_RESPONSE="$(api_post "${BASE_URL}/app-certificates/revoke" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
+REVOKE_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/app-certificates/revoke" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$REVOKE_RESPONSE"
 assert_api_success "$REVOKE_RESPONSE" "APP revoke"
 assert_equals "revoked" "$(printf '%s' "$REVOKE_RESPONSE" | json_get "data.action")" "revoke action mismatch"
@@ -194,7 +196,7 @@ assert_equals "1" "$OUTBOX_REVOKE_COUNT" "REVOKE outbox count mismatch"
 
 echo
 echo "== 8) APP recover =="
-RECOVER_RESPONSE="$(api_post "${BASE_URL}/app-certificates/recover" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
+RECOVER_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/app-certificates/recover" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$RECOVER_RESPONSE"
 assert_api_success "$RECOVER_RESPONSE" "APP recover"
 assert_equals "recovered" "$(printf '%s' "$RECOVER_RESPONSE" | json_get "data.action")" "recover action mismatch"

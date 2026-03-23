@@ -2,6 +2,7 @@ package com.pki.platform.issuance.mapper;
 
 import com.pki.platform.issuance.model.CertificateIssueFact;
 import java.time.OffsetDateTime;
+import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface CertificateIssueFactMapper {
@@ -18,9 +19,9 @@ public interface CertificateIssueFactMapper {
     CertificateIssueFact selectLatestBySubjectIdAndOrganization(@Param("subjectId") String subjectId,
                                                                 @Param("organization") String organization);
 
-    CertificateIssueFact selectBySubjectIdAndOrganizationAndCertSerial(@Param("subjectId") String subjectId,
-                                                                       @Param("organization") String organization,
-                                                                       @Param("certSerial") String certSerial);
+    List<CertificateIssueFact> selectBySubjectIdAndOrganizationAndCertSerial(@Param("subjectId") String subjectId,
+                                                                              @Param("organization") String organization,
+                                                                              @Param("certSerial") String certSerial);
 
     CertificateIssueFact selectByRequestIdAndStatus(@Param("requestId") String requestId,
                                                     @Param("status") String status,

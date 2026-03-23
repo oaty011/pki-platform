@@ -68,7 +68,6 @@
           AND organization = #{organization}
           AND cert_serial = #{certSerial}
         ORDER BY created_at DESC, id DESC
-        LIMIT 1
     </select>
 
     <select id="selectByRequestIdAndStatus" resultMap="certificateIssueFactResultMap">

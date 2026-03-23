@@ -107,6 +107,11 @@ public class RevocationCommandService {
                                           String organization,
                                           String certSerial,
                                           String issuerId) {
+        CertificateIssueFact issueFact = certificateIssueFactMapper.selectByCertSerialAndIssuerId(certSerial, issuerId);
+        if (issueFact != null) {
+            validateSubjectOwnership(subjectId, issueFact.getSubjectId());
+        }
+
         int shardId = partitionService.calculateShard(subjectId, organization);
         String tableName = partitionService.resolveCoreActiveTable(shardId);
         CoreActiveRecord activeRecord = appDomain
@@ -165,6 +170,7 @@ public class RevocationCommandService {
             );
         }
         validateSubjectOwnership(subjectId, issueFact.getSubjectId());
+        validateRecoverOrganization(organization, issueFact.getOrganization());
 
         int shardId = partitionService.calculateShard(subjectId, organization);
         String tableName = partitionService.resolveCoreActiveTable(shardId);
@@ -255,6 +261,16 @@ public class RevocationCommandService {
         if (isBlank(requestedSubjectId) || isBlank(actualSubjectId)
             || !requestedSubjectId.equals(actualSubjectId)) {
             throw new BizException(ErrorCode.BUSINESS_ERROR, "subject does not match certificate owner");
+        }
+    }
+
+    private void validateRecoverOrganization(String requestedOrganization, String actualOrganization) {
+        if (isBlank(requestedOrganization) || isBlank(actualOrganization)
+            || !requestedOrganization.equals(actualOrganization)) {
+            throw new BizException(
+                ErrorCode.BUSINESS_ERROR,
+                "recover domain does not match certificate organization"
+            );
         }
     }
 

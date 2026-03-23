@@ -1,5 +1,7 @@
 package com.pki.platform.issuance.dto.response;
 
+import java.util.List;
+
 public class CurrentQueryResponse {
 
     private String subjectId;
@@ -8,7 +10,7 @@ public class CurrentQueryResponse {
     private Integer issuedCount;
     private CertificateQueryItemResponse latestIssuedCertificate;
     private CertificateQueryItemResponse currentActiveCertificate;
-    private CertificateQueryItemResponse certificate;
+    private List<CertificateQueryItemResponse> matchedCertificates;
 
     public String getSubjectId() {
         return subjectId;
@@ -58,11 +60,11 @@ public class CurrentQueryResponse {
         this.currentActiveCertificate = currentActiveCertificate;
     }
 
-    public CertificateQueryItemResponse getCertificate() {
-        return certificate;
+    public List<CertificateQueryItemResponse> getMatchedCertificates() {
+        return matchedCertificates;
     }
 
-    public void setCertificate(CertificateQueryItemResponse certificate) {
-        this.certificate = certificate;
+    public void setMatchedCertificates(List<CertificateQueryItemResponse> matchedCertificates) {
+        this.matchedCertificates = matchedCertificates;
     }
 }

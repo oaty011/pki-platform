@@ -2,6 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:18081}"
+REVOCATION_BASE_URL="${REVOCATION_BASE_URL:-http://localhost:18084}"
 PGHOST="${PGHOST:?PGHOST is required}"
 PGPORT="${PGPORT:-5432}"
 PGDATABASE="${PGDATABASE:?PGDATABASE is required}"
@@ -24,7 +25,7 @@ require_cmd() {
 
 json_get() {
   local path="$1"
-  python3 - "$path" <<'PY'
+  python3 -c '
 import json
 import sys
 
@@ -44,7 +45,7 @@ elif isinstance(cur, bool):
     print("true" if cur else "false")
 else:
     print(cur)
-PY
+' "$path"
 }
 
 sql_escape() {
@@ -129,6 +130,7 @@ require_cmd python3
 
 cat <<MSG
 BASE_URL=${BASE_URL}
+REVOCATION_BASE_URL=${REVOCATION_BASE_URL}
 PGHOST=${PGHOST}
 PGPORT=${PGPORT}
 PGDATABASE=${PGDATABASE}
@@ -179,7 +181,7 @@ CORE_ACTIVE_TABLE="$(printf 'core_active_%02d' "$SHARD_ID")"
 echo
 echo "== B1) Revoke mismatch request =="
 REVOKE_OUTBOX_BEFORE="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'REVOKE';")"
-REVOKE_MISMATCH_RESPONSE="$(api_post "${BASE_URL}/ecu-certificates/revoke" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
+REVOKE_MISMATCH_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/ecu-certificates/revoke" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$REVOKE_MISMATCH_RESPONSE"
 assert_api_failure_contains "$REVOKE_MISMATCH_RESPONSE" "subject does not match certificate owner" "revoke mismatch"
 
@@ -194,14 +196,14 @@ assert_equals "$REVOKE_OUTBOX_BEFORE" "$REVOKE_OUTBOX_AFTER" "REVOKE outbox shou
 
 echo
 echo "== C1) Real revoke to prepare recover mismatch =="
-REAL_REVOKE_RESPONSE="$(api_post "${BASE_URL}/ecu-certificates/revoke" "{\"deviceId\":\"${DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
+REAL_REVOKE_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/ecu-certificates/revoke" "{\"deviceId\":\"${DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$REAL_REVOKE_RESPONSE"
 assert_api_success "$REAL_REVOKE_RESPONSE" "real revoke"
 
 echo
 echo "== C2) Recover mismatch request =="
 RECOVER_OUTBOX_BEFORE="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'RECOVER';")"
-RECOVER_MISMATCH_RESPONSE="$(api_post "${BASE_URL}/ecu-certificates/recover" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
+RECOVER_MISMATCH_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/ecu-certificates/recover" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$RECOVER_MISMATCH_RESPONSE"
 assert_api_failure_contains "$RECOVER_MISMATCH_RESPONSE" "subject does not match certificate owner" "recover mismatch"
 
@@ -215,7 +217,7 @@ assert_equals "0" "$CORE_ACTIVE_AFTER_RECOVER_MISMATCH" "recover mismatch should
 assert_equals "$RECOVER_OUTBOX_BEFORE" "$RECOVER_OUTBOX_AFTER" "RECOVER outbox should not change after recover mismatch"
 
 echo
-echo "[PASS] APP subject mismatch failure path verified"
+echo "[PASS] ECU subject mismatch failure path verified"
 echo "requestId=${REQUEST_ID}"
 echo "realSubjectId=${REAL_SUBJECT_ID}"
 echo "mismatchDeviceId=${MISMATCH_DEVICE_ID}"

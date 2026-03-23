@@ -803,3 +803,158 @@ ORDER BY version;
 - Recover mismatch does not write any new row back into `pki_app.core_active_xx`.
 - Recover mismatch does not delete the existing row from `pki_revocation.revocation_current`.
 - Neither mismatch request appends a new outbox event.
+
+## APP matchedCertificates list by certSerial
+
+### Preconditions
+
+- The same APP subject already owns more than one certificate row in the resolved `pki_app.core_active_xx` shard.
+- Those rows share the same `certSerial` and the same `subjectId`.
+- Those rows use different `issuerId` values.
+- The APP subject is addressed by `appId` or `installId`.
+- The APP organization is `DFMC`.
+
+### API Calls
+
+- `POST /app-certificates/current/query`
+
+### Steps
+
+1. Prepare one APP subject that has multiple core_active rows with the same `certSerial` and different `issuerId`.
+2. Call `POST /app-certificates/current/query` with the real `appId` or `installId` and the shared `certSerial`.
+3. Confirm the system resolves shard only from `subjectId + organization`.
+4. Confirm the response does not use single-certificate view semantics.
+5. Confirm the response returns `matchedCertificates` as a list.
+
+### SQL Checks
+
+Use the real `certSerial` from the test data. Do not treat example values as fixed business values.
+
+Check APP core_active matches under the same subject:
+
+```sql
+SELECT cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+FROM pki_app.core_active_xx
+WHERE subject_id = 'app-owner-001'
+  AND cert_serial = 'REAL_CERT_SERIAL'
+ORDER BY issuer_id, updated_at DESC;
+```
+
+### Expected Result
+
+- The response contains:
+  - `subjectId`
+  - `organization = DFMC`
+  - `shardId`
+  - `matchedCertificates`
+- `matchedCertificates` is a list, not a single `certificate` object.
+- The list contains all rows under the current subject in the resolved shard that match the requested `certSerial`.
+- Each item contains:
+  - `certSerial`
+  - `issuerId`
+  - `isCurrent`
+  - `notAfter`
+  - `firstActivatedAt`
+
+## APP current query excludes same-shard foreign subject records
+
+### Preconditions
+
+- Two different APP subjects resolve to the same shard.
+- Both subjects have rows in the same `pki_app.core_active_xx` shard.
+- Both subjects have at least one row using the same `certSerial`.
+- The current request uses only one real APP subject, via `appId` or `installId`.
+- The APP organization is `DFMC`.
+
+### API Calls
+
+- `POST /app-certificates/current/query`
+
+### Steps
+
+1. Prepare two APP subjects that hash to the same shard.
+2. Ensure both subjects have core_active rows with the same `certSerial`.
+3. Call `POST /app-certificates/current/query` with the first subject and the shared `certSerial`.
+4. Confirm the system queries only the resolved shard.
+5. Confirm the response excludes rows that belong to the other subject.
+
+### SQL Checks
+
+Use the real `certSerial` from the test data. Do not treat example values as fixed business values.
+
+Check same-shard APP rows for both subjects:
+
+```sql
+SELECT cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+FROM pki_app.core_active_xx
+WHERE cert_serial = 'REAL_CERT_SERIAL'
+ORDER BY subject_id, issuer_id, updated_at DESC;
+```
+
+### Expected Result
+
+- The response returns only rows whose `subjectId` matches the requested APP subject.
+- Rows belonging to a different subject in the same shard are not returned.
+- If the shard contains only foreign-subject rows for that `certSerial`, the response does not return those rows.
+- Any fallback to `issue_fact` stays limited to the current `subjectId + organization + certSerial`.
+
+## APP recover domain mismatch failure path
+
+### Preconditions
+
+- A certificate exists in `pki_revocation.revocation_current`.
+- The certificate belongs to an ECU issuance record whose `organization = DFMC_ECU`.
+- The same `certSerial` and `issuerId` are used in an APP recover request.
+- The APP request subject is otherwise valid for APP routing.
+
+### API Calls
+
+- `POST /app-certificates/recover`
+
+### Steps
+
+1. Prepare one revoked certificate whose `issue_fact.organization` is `DFMC_ECU`.
+2. Call `POST /app-certificates/recover` with APP subject input and the same `certSerial` and `issuerId`.
+3. Confirm the request reaches the new subject-route recover path.
+4. Confirm recover checks both subject ownership and organization/domain consistency before write-back.
+5. Confirm the request fails on organization/domain mismatch.
+
+### SQL Checks
+
+Use the real `certSerial` and `issuerId` from the revoked certificate. Do not treat example values as fixed business values.
+
+Check issue_fact organization:
+
+```sql
+SELECT cert_serial, issuer_id, subject_id, organization, not_after, created_at, updated_at
+FROM pki_issuance.certificate_issue_fact
+WHERE cert_serial = 'REAL_CERT_SERIAL'
+  AND issuer_id = 'REAL_ISSUER_ID'
+ORDER BY created_at DESC;
+```
+
+Check revocation_current remains unchanged:
+
+```sql
+SELECT cert_serial, issuer_id, revoked_at, reason, first_activated_at, updated_at
+FROM pki_revocation.revocation_current
+WHERE cert_serial = 'REAL_CERT_SERIAL'
+  AND issuer_id = 'REAL_ISSUER_ID';
+```
+
+Check APP core_active write-back did not happen:
+
+```sql
+SELECT cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+FROM pki_app.core_active_xx
+WHERE cert_serial = 'REAL_CERT_SERIAL'
+  AND issuer_id = 'REAL_ISSUER_ID';
+```
+
+### Expected Result
+
+- The recover request fails with:
+  - `recover domain does not match certificate organization`
+- The row remains in `pki_revocation.revocation_current`.
+- No APP `core_active_xx` row is written back for that certificate.
+- The scenario proves recover now enforces organization/domain consistency before write-back.
