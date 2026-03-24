@@ -66,7 +66,6 @@ public class CoreActiveSyncService {
         coreActiveRecord.setCertSerial(issueFact.getCertSerial());
         coreActiveRecord.setIssuerId(issueFact.getIssuerId());
         coreActiveRecord.setSubjectId(issueFact.getSubjectId());
-        coreActiveRecord.setCurrent(Boolean.TRUE);
         coreActiveRecord.setNotAfter(issueFact.getNotAfter());
         // first_activated_at stays null until a later real activation flow writes it.
         coreActiveRecord.setFirstActivatedAt(null);
@@ -77,13 +76,9 @@ public class CoreActiveSyncService {
         try {
             DomainRoutingService.DomainTarget target = domainRoutingService.resolveByTemplateId(issueFact.getTemplateId());
             if (target == DomainRoutingService.DomainTarget.APP) {
-                phase = "core-active-mark-old-false";
-                appCoreActiveShardMapper.markCurrentFalseBySubjectIdInShard(tableName, issueFact.getSubjectId(), now);
                 phase = "core-active-upsert";
                 appCoreActiveShardMapper.upsertToShard(tableName, coreActiveRecord);
             } else {
-                phase = "core-active-mark-old-false";
-                ecuCoreActiveShardMapper.markCurrentFalseBySubjectIdInShard(tableName, issueFact.getSubjectId(), now);
                 phase = "core-active-upsert";
                 ecuCoreActiveShardMapper.upsertToShard(tableName, coreActiveRecord);
             }

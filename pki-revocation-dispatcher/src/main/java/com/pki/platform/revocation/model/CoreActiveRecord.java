@@ -7,7 +7,6 @@ public class CoreActiveRecord {
     private String certSerial;
     private String issuerId;
     private String subjectId;
-    private Boolean current;
     private OffsetDateTime notAfter;
     private OffsetDateTime firstActivatedAt;
     private OffsetDateTime createdAt;
@@ -35,14 +34,6 @@ public class CoreActiveRecord {
 
     public void setSubjectId(String subjectId) {
         this.subjectId = subjectId;
-    }
-
-    public Boolean getCurrent() {
-        return current;
-    }
-
-    public void setCurrent(Boolean current) {
-        this.current = current;
     }
 
     public OffsetDateTime getNotAfter() {

@@ -8,7 +8,6 @@
         <id column="cert_serial" property="certSerial" />
         <id column="issuer_id" property="issuerId" />
         <result column="subject_id" property="subjectId" />
-        <result column="is_current" property="current" />
         <result column="not_after" property="notAfter" />
         <result column="first_activated_at" property="firstActivatedAt" />
         <result column="created_at" property="createdAt" />
@@ -17,32 +16,14 @@
 
     <insert id="upsertToShard">
         INSERT INTO pki_app.${tableName} (
-            cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
+            cert_serial, issuer_id, subject_id, not_after, first_activated_at, created_at, updated_at
         ) VALUES (
-            #{record.certSerial}, #{record.issuerId}, #{record.subjectId}, #{record.current}, #{record.notAfter}, #{record.firstActivatedAt}, #{record.createdAt}, #{record.updatedAt}
+            #{record.certSerial}, #{record.issuerId}, #{record.subjectId}, #{record.notAfter}, #{record.firstActivatedAt}, #{record.createdAt}, #{record.updatedAt}
         )
         ON CONFLICT (cert_serial, issuer_id) DO UPDATE
         SET subject_id = EXCLUDED.subject_id,
-            is_current = EXCLUDED.is_current,
             not_after = EXCLUDED.not_after,
             first_activated_at = COALESCE(pki_app.${tableName}.first_activated_at, EXCLUDED.first_activated_at),
             updated_at = EXCLUDED.updated_at
     </insert>
-
-    <select id="selectCurrentBySubjectIdFromShard" resultMap="coreActiveRecordResultMap">
-        SELECT cert_serial, issuer_id, subject_id, is_current, not_after, first_activated_at, created_at, updated_at
-        FROM pki_app.${tableName}
-        WHERE subject_id = #{subjectId}
-          AND is_current = TRUE
-        ORDER BY updated_at DESC
-        LIMIT 1
-    </select>
-
-    <update id="markCurrentFalseBySubjectIdInShard">
-        UPDATE pki_app.${tableName}
-        SET is_current = FALSE,
-            updated_at = #{updatedAt}
-        WHERE subject_id = #{subjectId}
-          AND is_current = TRUE
-    </update>
 </mapper>

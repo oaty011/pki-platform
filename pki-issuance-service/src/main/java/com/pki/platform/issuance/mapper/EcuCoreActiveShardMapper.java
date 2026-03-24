@@ -13,13 +13,17 @@ public interface EcuCoreActiveShardMapper {
     int upsertToShard(@Param("tableName") String tableName,
                       @Param("record") CoreActiveRecord record);
 
-    CoreActiveRecord selectCurrentBySubjectIdFromShard(@Param("tableName") String tableName,
-                                                       @Param("subjectId") String subjectId);
+    CoreActiveRecord selectLatestActiveBySubjectIdFromShard(@Param("tableName") String tableName,
+                                                            @Param("subjectId") String subjectId);
 
     List<CoreActiveRecord> selectByCertSerialFromShard(@Param("tableName") String tableName,
                                                        @Param("certSerial") String certSerial);
 
-    int markCurrentFalseBySubjectIdInShard(@Param("tableName") String tableName,
-                                           @Param("subjectId") String subjectId,
-                                           @Param("updatedAt") java.time.OffsetDateTime updatedAt);
+    CoreActiveRecord selectByCertSerialAndIssuerIdFromShard(@Param("tableName") String tableName,
+                                                            @Param("certSerial") String certSerial,
+                                                            @Param("issuerId") String issuerId);
+
+    int refreshUpdatedAtByCertSerialAndIssuerIdFromShard(@Param("tableName") String tableName,
+                                                         @Param("certSerial") String certSerial,
+                                                         @Param("issuerId") String issuerId);
 }

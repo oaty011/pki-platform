@@ -11,11 +11,4 @@ public interface CoreActiveShardMapper {
      */
     int upsertToShard(@Param("tableName") String tableName,
                       @Param("record") CoreActiveRecord record);
-
-    CoreActiveRecord selectCurrentBySubjectIdFromShard(@Param("tableName") String tableName,
-                                                       @Param("subjectId") String subjectId);
-
-    int markCurrentFalseBySubjectIdInShard(@Param("tableName") String tableName,
-                                           @Param("subjectId") String subjectId,
-                                           @Param("updatedAt") java.time.OffsetDateTime updatedAt);
 }

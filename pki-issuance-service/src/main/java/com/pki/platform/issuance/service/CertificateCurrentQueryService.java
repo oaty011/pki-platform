@@ -27,29 +27,29 @@ public class CertificateCurrentQueryService {
     }
 
     public CurrentCertificateResponse getCurrentAppCertificate(String subjectId) {
-        return toResponse(loadApp(subjectId));
+        return toResponse(loadLatestActiveApp(subjectId));
     }
 
     public CurrentCertificateResponse getCurrentEcuCertificate(String subjectId) {
-        return toResponse(loadEcu(subjectId));
+        return toResponse(loadLatestActiveEcu(subjectId));
     }
 
-    private CoreActiveRecord loadApp(String subjectId) {
+    private CoreActiveRecord loadLatestActiveApp(String subjectId) {
         int shardId = partitionService.calculateShard(subjectId, organizationResolver.getAppOrganization());
         String tableName = partitionService.resolveCoreActiveTable(shardId);
-        CoreActiveRecord record = appCoreActiveShardMapper.selectCurrentBySubjectIdFromShard(tableName, subjectId);
+        CoreActiveRecord record = appCoreActiveShardMapper.selectLatestActiveBySubjectIdFromShard(tableName, subjectId);
         if (record == null) {
-            throw new BizException(ErrorCode.REQUEST_NOT_FOUND, "current app certificate not found for subjectId=" + subjectId);
+            throw new BizException(ErrorCode.REQUEST_NOT_FOUND, "latest active app certificate not found for subjectId=" + subjectId);
         }
         return record;
     }
 
-    private CoreActiveRecord loadEcu(String subjectId) {
+    private CoreActiveRecord loadLatestActiveEcu(String subjectId) {
         int shardId = partitionService.calculateShard(subjectId, organizationResolver.getEcuOrganization());
         String tableName = partitionService.resolveCoreActiveTable(shardId);
-        CoreActiveRecord record = ecuCoreActiveShardMapper.selectCurrentBySubjectIdFromShard(tableName, subjectId);
+        CoreActiveRecord record = ecuCoreActiveShardMapper.selectLatestActiveBySubjectIdFromShard(tableName, subjectId);
         if (record == null) {
-            throw new BizException(ErrorCode.REQUEST_NOT_FOUND, "current ecu certificate not found for subjectId=" + subjectId);
+            throw new BizException(ErrorCode.REQUEST_NOT_FOUND, "latest active ecu certificate not found for subjectId=" + subjectId);
         }
         return record;
     }
@@ -59,7 +59,6 @@ public class CertificateCurrentQueryService {
             record.getSubjectId(),
             record.getCertSerial(),
             record.getIssuerId(),
-            record.getCurrent(),
             record.getNotAfter(),
             record.getFirstActivatedAt()
         );

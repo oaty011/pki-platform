@@ -1,5 +1,11 @@
 # Minimal Verification Guide
 
+Status note:
+
+- This document mainly describes the early minimal closure.
+- For the current implementation baseline, use [issuance-phase1-summary.md](/Users/wuge/Desktop/CodeX/PKI Platform/docs/issuance-phase1-summary.md).
+- `is_current`-based expectations in this document are historical and no longer reflect the current main-path semantics.
+
 This guide verifies the current minimal issuance closure without changing Java code or database schema.
 
 ## Files

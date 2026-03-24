@@ -3,10 +3,12 @@ package com.pki.platform.issuance.controller;
 import com.pki.platform.common.response.ApiResponse;
 import com.pki.platform.issuance.dto.request.AppCurrentQueryRequest;
 import com.pki.platform.issuance.dto.request.AppCertificateApplyRequest;
+import com.pki.platform.issuance.dto.request.CertificateRefreshStatusRequest;
 import com.pki.platform.issuance.dto.request.EcuCurrentQueryRequest;
 import com.pki.platform.issuance.dto.request.EcuCertificateApplyRequest;
 import com.pki.platform.issuance.dto.response.AppCertificateApplyResponse;
 import com.pki.platform.issuance.dto.response.CertificateContentResponse;
+import com.pki.platform.issuance.dto.response.CertificateRefreshStatusResponse;
 import com.pki.platform.issuance.dto.response.CertificateStatusResponse;
 import com.pki.platform.issuance.dto.response.CurrentCertificateResponse;
 import com.pki.platform.issuance.dto.response.CurrentQueryResponse;
@@ -15,6 +17,7 @@ import com.pki.platform.issuance.service.CertificateApplicationService;
 import com.pki.platform.issuance.service.CertificateCurrentQueryFacadeService;
 import com.pki.platform.issuance.service.CertificateCurrentQueryService;
 import com.pki.platform.issuance.service.CertificateQueryService;
+import com.pki.platform.issuance.service.CertificateRefreshStatusService;
 import com.pki.platform.issuance.service.CoreActiveSyncService;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,17 +34,20 @@ public class CertificateController {
     private final CertificateCurrentQueryService certificateCurrentQueryService;
     private final CertificateCurrentQueryFacadeService certificateCurrentQueryFacadeService;
     private final CoreActiveSyncService coreActiveSyncService;
+    private final CertificateRefreshStatusService certificateRefreshStatusService;
 
     public CertificateController(CertificateApplicationService certificateApplicationService,
                                  CertificateQueryService certificateQueryService,
                                  CertificateCurrentQueryService certificateCurrentQueryService,
                                  CertificateCurrentQueryFacadeService certificateCurrentQueryFacadeService,
-                                 CoreActiveSyncService coreActiveSyncService) {
+                                 CoreActiveSyncService coreActiveSyncService,
+                                 CertificateRefreshStatusService certificateRefreshStatusService) {
         this.certificateApplicationService = certificateApplicationService;
         this.certificateQueryService = certificateQueryService;
         this.certificateCurrentQueryService = certificateCurrentQueryService;
         this.certificateCurrentQueryFacadeService = certificateCurrentQueryFacadeService;
         this.coreActiveSyncService = coreActiveSyncService;
+        this.certificateRefreshStatusService = certificateRefreshStatusService;
     }
 
     @PostMapping("/app-certificates/apply")
@@ -92,5 +98,10 @@ public class CertificateController {
             "syncStatus", result.getSyncStatus(),
             "action", result.getAction()
         ));
+    }
+
+    @PostMapping("/certificates/refresh-status")
+    public ApiResponse<CertificateRefreshStatusResponse> refreshStatus(@RequestBody CertificateRefreshStatusRequest request) {
+        return ApiResponse.success(certificateRefreshStatusService.refresh(request));
     }
 }

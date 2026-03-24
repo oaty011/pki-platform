@@ -6,7 +6,6 @@ public class CertificateQueryItemResponse {
 
     private String certSerial;
     private String issuerId;
-    private Boolean isCurrent;
     private OffsetDateTime notAfter;
     private OffsetDateTime firstActivatedAt;
 
@@ -24,14 +23,6 @@ public class CertificateQueryItemResponse {
 
     public void setIssuerId(String issuerId) {
         this.issuerId = issuerId;
-    }
-
-    public Boolean getIsCurrent() {
-        return isCurrent;
-    }
-
-    public void setIsCurrent(Boolean current) {
-        isCurrent = current;
     }
 
     public OffsetDateTime getNotAfter() {

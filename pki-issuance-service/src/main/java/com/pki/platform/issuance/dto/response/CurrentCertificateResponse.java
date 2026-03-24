@@ -7,7 +7,6 @@ public class CurrentCertificateResponse {
     private String subjectId;
     private String certSerial;
     private String issuerId;
-    private Boolean isCurrent;
     private OffsetDateTime notAfter;
     private OffsetDateTime firstActivatedAt;
 
@@ -17,13 +16,11 @@ public class CurrentCertificateResponse {
     public CurrentCertificateResponse(String subjectId,
                                       String certSerial,
                                       String issuerId,
-                                      Boolean isCurrent,
                                       OffsetDateTime notAfter,
                                       OffsetDateTime firstActivatedAt) {
         this.subjectId = subjectId;
         this.certSerial = certSerial;
         this.issuerId = issuerId;
-        this.isCurrent = isCurrent;
         this.notAfter = notAfter;
         this.firstActivatedAt = firstActivatedAt;
     }
@@ -50,14 +47,6 @@ public class CurrentCertificateResponse {
 
     public void setIssuerId(String issuerId) {
         this.issuerId = issuerId;
-    }
-
-    public Boolean getIsCurrent() {
-        return isCurrent;
-    }
-
-    public void setIsCurrent(Boolean current) {
-        isCurrent = current;
     }
 
     public OffsetDateTime getNotAfter() {

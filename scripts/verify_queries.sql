@@ -20,14 +20,28 @@ WHERE request_id IN (:'request_id_app', :'request_id_app_2', :'request_id_ecu')
 GROUP BY request_id
 ORDER BY request_id;
 
-\echo '2) core_active current switch validation'
+\echo '2) core_active latest active validation'
 -- Replace core_active_xx with the shard table resolved by PartitionService/logs.
-SELECT cert_serial, issuer_id, subject_id, is_current, created_at, updated_at
+-- Main validation: the latest active record should be the row with the newest created_at / updated_at under the same subject.
+SELECT cert_serial, issuer_id, subject_id, created_at, updated_at
+FROM pki_app.core_active_xx
+WHERE subject_id = :'app_subject_id'
+ORDER BY created_at DESC, updated_at DESC
+LIMIT 1;
+
+SELECT cert_serial, issuer_id, subject_id, created_at, updated_at
+FROM pki_ecu.core_active_xx
+WHERE subject_id = :'ecu_subject_id'
+ORDER BY created_at DESC, updated_at DESC
+LIMIT 1;
+
+\echo '3) core_active full active-set observation'
+SELECT cert_serial, issuer_id, subject_id, created_at, updated_at
 FROM pki_app.core_active_xx
 WHERE subject_id = :'app_subject_id'
 ORDER BY updated_at;
 
-SELECT cert_serial, issuer_id, subject_id, is_current, created_at, updated_at
+SELECT cert_serial, issuer_id, subject_id, created_at, updated_at
 FROM pki_ecu.core_active_xx
 WHERE subject_id = :'ecu_subject_id'
 ORDER BY updated_at;

@@ -7,7 +7,6 @@ public class CoreActiveRecord {
     private String certSerial;
     private String issuerId;
     private String subjectId;
-    private Boolean current;
     /**
      * core_active only stores certificates that still remain in the primary set.
      * Revoked or expired certificates will later leave this set by table migration,
@@ -43,14 +42,6 @@ public class CoreActiveRecord {
 
     public void setSubjectId(String subjectId) {
         this.subjectId = subjectId;
-    }
-
-    public Boolean getCurrent() {
-        return current;
-    }
-
-    public void setCurrent(Boolean current) {
-        this.current = current;
     }
 
     public OffsetDateTime getNotAfter() {

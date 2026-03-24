@@ -1,5 +1,10 @@
 # New Subject-Route Verification
 
+Status note:
+
+- For the current issuance-side implementation baseline, see [issuance-phase1-summary.md](/Users/wuge/Desktop/CodeX/PKI Platform/docs/issuance-phase1-summary.md).
+- This document still contains historical SQL examples with `is_current` for verification context; they are no longer the source of truth for issuance main-path semantics.
+
 ## Scope
 
 ### Deprecated legacy certSerial revoke/recover routes

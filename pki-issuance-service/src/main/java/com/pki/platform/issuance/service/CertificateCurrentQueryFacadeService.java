@@ -79,8 +79,8 @@ public class CertificateCurrentQueryFacadeService {
             ));
             response.setCurrentActiveCertificate(toCoreActiveItem(
                 appDomain
-                    ? appCoreActiveShardMapper.selectCurrentBySubjectIdFromShard(tableName, subjectId)
-                    : ecuCoreActiveShardMapper.selectCurrentBySubjectIdFromShard(tableName, subjectId)
+                    ? appCoreActiveShardMapper.selectLatestActiveBySubjectIdFromShard(tableName, subjectId)
+                    : ecuCoreActiveShardMapper.selectLatestActiveBySubjectIdFromShard(tableName, subjectId)
             ));
             return response;
         }
@@ -111,7 +111,6 @@ public class CertificateCurrentQueryFacadeService {
         item.setIssuerId(record.getIssuerId());
         item.setNotAfter(record.getNotAfter());
         item.setFirstActivatedAt(null);
-        item.setIsCurrent(null);
         return item;
     }
 
@@ -124,7 +123,6 @@ public class CertificateCurrentQueryFacadeService {
         item.setIssuerId(record.getIssuerId());
         item.setNotAfter(record.getNotAfter());
         item.setFirstActivatedAt(record.getFirstActivatedAt());
-        item.setIsCurrent(record.getCurrent());
         return item;
     }
 

@@ -118,6 +118,9 @@ public class RevocationCommandService {
             ? appCoreActiveShardMapper.selectByCertSerialAndIssuerIdFromShard(tableName, certSerial, issuerId)
             : ecuCoreActiveShardMapper.selectByCertSerialAndIssuerIdFromShard(tableName, certSerial, issuerId);
         if (activeRecord == null) {
+            if (isAlreadyRevoked(certSerial, issuerId)) {
+                return new CommandResult(certSerial, issuerId, "revoked");
+            }
             throw new BizException(
                 ErrorCode.REQUEST_NOT_FOUND,
                 "certificate is not in core_active, revoke is not allowed"
@@ -129,6 +132,9 @@ public class RevocationCommandService {
             ? appCoreActiveShardMapper.deleteByCertSerialAndIssuerIdFromShard(tableName, certSerial, issuerId)
             : ecuCoreActiveShardMapper.deleteByCertSerialAndIssuerIdFromShard(tableName, certSerial, issuerId);
         if (deleted == 0) {
+            if (isAlreadyRevoked(certSerial, issuerId)) {
+                return new CommandResult(certSerial, issuerId, "revoked");
+            }
             throw new BizException(
                 ErrorCode.BUSINESS_ERROR,
                 "failed to delete certificate from core_active: certSerial=" + certSerial + ", issuerId=" + issuerId
@@ -147,6 +153,10 @@ public class RevocationCommandService {
 
         insertOutbox(certSerial, issuerId, EVENT_REVOKE, now);
         return new CommandResult(certSerial, issuerId, "revoked");
+    }
+
+    private boolean isAlreadyRevoked(String certSerial, String issuerId) {
+        return revocationCurrentMapper.selectByCertSerialAndIssuerId(certSerial, issuerId) != null;
     }
 
     private CommandResult recoverBySubject(boolean appDomain,
@@ -180,7 +190,6 @@ public class RevocationCommandService {
         restoredRecord.setCertSerial(certSerial);
         restoredRecord.setIssuerId(issuerId);
         restoredRecord.setSubjectId(subjectId);
-        restoredRecord.setCurrent(Boolean.FALSE);
         restoredRecord.setNotAfter(issueFact.getNotAfter());
         restoredRecord.setFirstActivatedAt(revocationCurrent.getFirstActivatedAt());
         restoredRecord.setCreatedAt(now);
@@ -192,7 +201,11 @@ public class RevocationCommandService {
             ecuCoreActiveShardMapper.upsertToShard(tableName, restoredRecord);
         }
 
-        revocationCurrentMapper.deleteByCertSerialAndIssuerId(certSerial, issuerId);
+        int deleted = revocationCurrentMapper.deleteByCertSerialAndIssuerId(certSerial, issuerId);
+        if (deleted == 0) {
+            return new CommandResult(certSerial, issuerId, "recovered");
+        }
+
         insertOutbox(certSerial, issuerId, EVENT_RECOVER, now);
         return new CommandResult(certSerial, issuerId, "recovered");
     }

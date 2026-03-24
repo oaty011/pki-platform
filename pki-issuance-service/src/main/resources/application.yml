@@ -26,3 +26,27 @@ mybatis:
   type-aliases-package: com.pki.platform.issuance.model
   configuration:
     map-underscore-to-camel-case: true
+
+pki:
+  issuance:
+    provider:
+      type: ${PKI_ISSUANCE_PROVIDER_TYPE:local-x509}
+    signer:
+      type: ${PKI_ISSUANCE_SIGNER_TYPE:soft}
+      soft:
+        keystore-path: ${PKI_ISSUANCE_SIGNER_SOFT_KEYSTORE_PATH:}
+        keystore-password: ${PKI_ISSUANCE_SIGNER_SOFT_KEYSTORE_PASSWORD:}
+        key-alias: ${PKI_ISSUANCE_SIGNER_SOFT_KEY_ALIAS:}
+        key-password: ${PKI_ISSUANCE_SIGNER_SOFT_KEY_PASSWORD:}
+        certificate-path: ${PKI_ISSUANCE_SIGNER_SOFT_CERTIFICATE_PATH:}
+        private-key-path: ${PKI_ISSUANCE_SIGNER_SOFT_PRIVATE_KEY_PATH:}
+        signature-algorithm: ${PKI_ISSUANCE_SIGNER_SOFT_SIGNATURE_ALGORITHM:SHA256withRSA}
+    issue-fact-cleanup:
+      enabled: ${PKI_ISSUANCE_ISSUE_FACT_CLEANUP_ENABLED:true}
+      retention-days: ${PKI_ISSUANCE_ISSUE_FACT_CLEANUP_RETENTION_DAYS:30}
+      batch-size: ${PKI_ISSUANCE_ISSUE_FACT_CLEANUP_BATCH_SIZE:500}
+      cron: ${PKI_ISSUANCE_ISSUE_FACT_CLEANUP_CRON:0 0 3 * * *}
+    sync-core-active-compensation:
+      enabled: ${PKI_ISSUANCE_SYNC_CORE_ACTIVE_COMPENSATION_ENABLED:true}
+      batch-size: ${PKI_ISSUANCE_SYNC_CORE_ACTIVE_COMPENSATION_BATCH_SIZE:100}
+      cron: ${PKI_ISSUANCE_SYNC_CORE_ACTIVE_COMPENSATION_CRON:0 */5 * * * *}

@@ -6,11 +6,16 @@ import com.pki.platform.issuance.dto.request.AppCertificateApplyRequest;
 import com.pki.platform.issuance.dto.request.EcuCertificateApplyRequest;
 import com.pki.platform.issuance.dto.response.AppCertificateApplyResponse;
 import com.pki.platform.issuance.dto.response.EcuCertificateApplyResponse;
-import com.pki.platform.issuance.dto.response.MockSignResult;
 import com.pki.platform.issuance.enums.CertificateIssueStatus;
 import com.pki.platform.issuance.enums.IssueSyncStatus;
 import com.pki.platform.issuance.mapper.CertificateIssueFactMapper;
 import com.pki.platform.issuance.model.CertificateIssueFact;
+import com.pki.platform.issuance.service.issuance.CertificateIssuanceCommand;
+import com.pki.platform.issuance.service.issuance.CertificateIssuanceProvider;
+import com.pki.platform.issuance.service.issuance.CertificateIssuanceResult;
+import com.pki.platform.issuance.template.CertificateTemplate;
+import com.pki.platform.issuance.template.CertificateTemplateRegistry;
+import com.pki.platform.issuance.template.CertificateType;
 import java.time.OffsetDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,29 +29,30 @@ public class CertificateApplicationService {
     private static final Logger log = LoggerFactory.getLogger(CertificateApplicationService.class);
 
     private final CertificateIssueFactMapper certificateIssueFactMapper;
-    private final MockSignerService mockSignerService;
+    private final CertificateIssuanceProvider certificateIssuanceProvider;
+    private final CertificateTemplateRegistry certificateTemplateRegistry;
     private final InstallIdGenerator installIdGenerator;
-    private final OrganizationResolver organizationResolver;
 
     public CertificateApplicationService(CertificateIssueFactMapper certificateIssueFactMapper,
-                                         MockSignerService mockSignerService,
-                                         InstallIdGenerator installIdGenerator,
-                                         OrganizationResolver organizationResolver) {
+                                         CertificateIssuanceProvider certificateIssuanceProvider,
+                                         CertificateTemplateRegistry certificateTemplateRegistry,
+                                         InstallIdGenerator installIdGenerator) {
         this.certificateIssueFactMapper = certificateIssueFactMapper;
-        this.mockSignerService = mockSignerService;
+        this.certificateIssuanceProvider = certificateIssuanceProvider;
+        this.certificateTemplateRegistry = certificateTemplateRegistry;
         this.installIdGenerator = installIdGenerator;
-        this.organizationResolver = organizationResolver;
     }
 
     @Transactional
     public AppCertificateApplyResponse applyAppCertificate(AppCertificateApplyRequest request) {
         validateBase(request == null ? null : request.getRequestId(), request == null ? null : request.getTemplateId());
-        ensureTemplatePrefix(request.getTemplateId(), "app-");
+        CertificateTemplate template = certificateTemplateRegistry.getRequired(request.getTemplateId());
+        ensureTemplateType(template, CertificateType.APP);
 
         String appId = normalize(request.getAppId());
         String installId = appId == null ? installIdGenerator.generate() : null;
         String subjectId = appId != null ? appId : installId;
-        CertificateIssueFact issueFact = issue(request.getRequestId(), request.getTemplateId(), subjectId);
+        CertificateIssueFact issueFact = issue(request.getRequestId(), template, subjectId, request.getCsr());
         return new AppCertificateApplyResponse(issueFact.getRequestId(), issueFact.getStatus(), appId, installId);
     }
 
@@ -56,28 +62,29 @@ public class CertificateApplicationService {
         if (request == null || isBlank(request.getDeviceId())) {
             throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "deviceId is required");
         }
-        ensureTemplatePrefix(request.getTemplateId(), "ecu-");
+        CertificateTemplate template = certificateTemplateRegistry.getRequired(request.getTemplateId());
+        ensureTemplateType(template, CertificateType.ECU);
 
-        CertificateIssueFact issueFact = issue(request.getRequestId(), request.getTemplateId(), request.getDeviceId());
+        CertificateIssueFact issueFact = issue(request.getRequestId(), template, request.getDeviceId(), request.getCsr());
         return new EcuCertificateApplyResponse(issueFact.getRequestId(), issueFact.getStatus(), request.getDeviceId());
     }
 
-    private CertificateIssueFact issue(String requestId, String templateId, String subjectId) {
+    private CertificateIssueFact issue(String requestId, CertificateTemplate template, String subjectId, String csrPem) {
         CertificateIssueFact existing = certificateIssueFactMapper.selectByRequestId(requestId);
         if (existing != null) {
             log.info("apply idempotent hit existing requestId={}", requestId);
             return existing;
         }
 
-        MockSignResult signResult = mockSignerService.sign(subjectId, templateId);
+        CertificateIssuanceCommand command = buildCommand(requestId, template, subjectId, csrPem);
+        CertificateIssuanceResult signResult = certificateIssuanceProvider.issue(command);
         OffsetDateTime now = OffsetDateTime.now();
-        String organization = organizationResolver.resolveByTemplateId(templateId);
 
         CertificateIssueFact record = new CertificateIssueFact();
         record.setRequestId(requestId);
-        record.setTemplateId(templateId);
+        record.setTemplateId(template.getTemplateId());
         record.setSubjectId(subjectId);
-        record.setOrganization(organization);
+        record.setOrganization(template.getOrganization());
         record.setIssuerId(signResult.getIssuerId());
         record.setSignerId(signResult.getSignerId());
         record.setCertSerial(signResult.getCertSerial());
@@ -102,15 +109,64 @@ public class CertificateApplicationService {
         }
     }
 
-    private void validateBase(String requestId, String templateId) {
-        if (isBlank(requestId) || isBlank(templateId)) {
-            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "requestId and templateId are required");
+    private CertificateIssuanceCommand buildCommand(String requestId,
+                                                    CertificateTemplate template,
+                                                    String subjectId,
+                                                    String csrPem) {
+        CertificateIssuanceCommand command = new CertificateIssuanceCommand();
+        command.setRequestId(requestId);
+        command.setTemplateId(template.getTemplateId());
+        command.setSubjectId(subjectId);
+        command.setCertificateType(template.getCertificateType());
+        command.setSubjectCnSource(template.getSubjectCnSource());
+        command.setOrganization(template.getOrganization());
+        command.setSubjectOu(template.getSubjectOu());
+        command.setSubjectO(template.getSubjectO());
+        command.setSubjectC(template.getSubjectC());
+        command.setSubjectDn(buildSubjectDn(template, subjectId));
+        command.setCsrPem(normalize(csrPem));
+        command.setValidityDays(template.getValidityDays());
+        command.setKeyAlgorithm(template.getKeyAlgorithm());
+        command.setDigitalSignature(template.isDigitalSignature());
+        command.setKeyEncipherment(template.isKeyEncipherment());
+        command.setClientAuth(template.isClientAuth());
+        command.setProviderType(template.getProviderType());
+        command.setSignerType(template.getSignerType());
+        command.setIssuerBinding(template.getIssuerBinding());
+        command.setNotBefore(OffsetDateTime.now());
+        command.setNotAfter(OffsetDateTime.now().plusDays(template.getValidityDays()));
+        return command;
+    }
+
+    private String buildSubjectDn(CertificateTemplate template, String subjectId) {
+        return "CN=" + subjectId
+            + ",OU=" + template.getSubjectOu()
+            + ",O=" + template.getSubjectO()
+            + ",C=" + template.getSubjectC();
+    }
+
+    private void ensureTemplateType(CertificateTemplate template, CertificateType expectedType) {
+        if (template.getCertificateType() != expectedType) {
+            throw new BizException(
+                ErrorCode.INVALID_TEMPLATE_ID,
+                "templateId does not match certificate type: " + template.getTemplateId()
+            );
         }
     }
 
-    private void ensureTemplatePrefix(String templateId, String prefix) {
-        if (templateId == null || !templateId.startsWith(prefix)) {
-            throw new BizException(ErrorCode.INVALID_TEMPLATE_ID, "templateId must start with " + prefix);
+    private String buildSubjectDn(String templateId, String subjectId) {
+        if (templateId != null && templateId.startsWith("app-")) {
+            return "CN=" + subjectId + ",OU=Vehicle Controller SDK,O=DFMC,C=CN";
+        }
+        if (templateId != null && templateId.startsWith("ecu-")) {
+            return "CN=" + subjectId + ",OU=" + templateId + ",O=DFMC ECU,C=CN";
+        }
+        return "CN=" + subjectId + ",O=DFMC,C=CN";
+    }
+
+    private void validateBase(String requestId, String templateId) {
+        if (isBlank(requestId) || isBlank(templateId)) {
+            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "requestId and templateId are required");
         }
     }
 

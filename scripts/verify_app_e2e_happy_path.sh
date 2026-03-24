@@ -171,11 +171,9 @@ echo
 echo "== 5) SQL checks after sync-core-active =="
 ISSUE_FACT_COUNT="$(sql_scalar "SELECT COUNT(*) FROM pki_issuance.certificate_issue_fact WHERE request_id = '$(sql_escape "$REQUEST_ID")';")"
 CORE_ACTIVE_EXISTS_AFTER_SYNC="$(sql_scalar "SELECT COUNT(*) FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
-CORE_ACTIVE_IS_CURRENT_AFTER_SYNC="$(sql_scalar "SELECT COALESCE(CAST(is_current AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
 CORE_ACTIVE_NOT_AFTER_AFTER_SYNC="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
 assert_equals "1" "$ISSUE_FACT_COUNT" "issue_fact row count mismatch"
 assert_equals "1" "$CORE_ACTIVE_EXISTS_AFTER_SYNC" "core_active row missing after sync"
-assert_equals "true" "$CORE_ACTIVE_IS_CURRENT_AFTER_SYNC" "core_active is_current mismatch after sync"
 assert_non_empty "$CORE_ACTIVE_NOT_AFTER_AFTER_SYNC" "core_active not_after is empty after sync"
 
 echo
@@ -204,14 +202,12 @@ assert_equals "recovered" "$(printf '%s' "$RECOVER_RESPONSE" | json_get "data.ac
 echo
 echo "== 9) SQL checks after recover =="
 CORE_ACTIVE_EXISTS_AFTER_RECOVER="$(sql_scalar "SELECT COUNT(*) FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
-CORE_ACTIVE_IS_CURRENT_AFTER_RECOVER="$(sql_scalar "SELECT COALESCE(CAST(is_current AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
 CORE_ACTIVE_NOT_AFTER_AFTER_RECOVER="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
 ISSUE_FACT_NOT_AFTER="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_issuance.certificate_issue_fact WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' ORDER BY created_at DESC LIMIT 1;")"
 NOT_AFTER_MATCH="$(sql_scalar "SELECT CASE WHEN (SELECT not_after FROM pki_issuance.certificate_issue_fact WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' ORDER BY created_at DESC LIMIT 1) = (SELECT not_after FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1) THEN 'true' ELSE 'false' END;")"
 REVOCATION_CURRENT_AFTER_RECOVER="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_current WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
 OUTBOX_RECOVER_COUNT="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'RECOVER';")"
 assert_equals "1" "$CORE_ACTIVE_EXISTS_AFTER_RECOVER" "core_active row missing after recover"
-assert_equals "false" "$CORE_ACTIVE_IS_CURRENT_AFTER_RECOVER" "recovered row should have is_current=false"
 assert_non_empty "$CORE_ACTIVE_NOT_AFTER_AFTER_RECOVER" "recovered row not_after is empty"
 assert_non_empty "$ISSUE_FACT_NOT_AFTER" "issue_fact not_after is empty"
 assert_equals "true" "$NOT_AFTER_MATCH" "recovered not_after does not match issue_fact"
@@ -226,7 +222,8 @@ assert_api_success "$CURRENT_QUERY_2" "second current query"
 assert_equals "$APP_ID" "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.subjectId")" "second current query subjectId mismatch"
 assert_equals "$APP_ORGANIZATION" "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.organization")" "second current query organization mismatch"
 assert_equals "$SHARD_ID" "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.shardId")" "second current query shardId mismatch"
-assert_empty "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.currentActiveCertificate.certSerial")" "recovered certificate should not automatically become current"
+assert_equals "$CERT_SERIAL" "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.currentActiveCertificate.certSerial")" "default query should return latest active certificate after recover"
+assert_equals "$ISSUER_ID" "$(printf '%s' "$CURRENT_QUERY_2" | json_get "data.currentActiveCertificate.issuerId")" "default query latest active issuerId mismatch after recover"
 
 echo
 echo "[PASS] APP E2E happy path verified"

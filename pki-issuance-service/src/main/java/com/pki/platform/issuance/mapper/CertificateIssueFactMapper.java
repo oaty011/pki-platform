@@ -27,6 +27,14 @@ public interface CertificateIssueFactMapper {
                                                     @Param("status") String status,
                                                     @Param("syncStatus") String syncStatus);
 
+    List<String> selectRequestIdsForSyncCompensation(@Param("status") String status,
+                                                     @Param("pendingStatus") String pendingStatus,
+                                                     @Param("failedStatus") String failedStatus,
+                                                     @Param("limit") int limit);
+
+    int deleteExpiredIssueFacts(@Param("cutoff") OffsetDateTime cutoff,
+                                @Param("batchSize") int batchSize);
+
     int updateSyncStatusByRequestId(@Param("requestId") String requestId,
                                     @Param("syncStatus") String syncStatus,
                                     @Param("updatedAt") OffsetDateTime updatedAt);

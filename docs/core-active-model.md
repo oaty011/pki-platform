@@ -1,13 +1,18 @@
 # Core Active Model
 
+Current implementation status note:
+
+- The latest implementation baseline is [issuance-phase1-summary.md](/Users/wuge/Desktop/CodeX/PKI Platform/docs/issuance-phase1-summary.md).
+- `is_current` has already been removed from the schema and main logic.
+- The default query result is now the latest record in `core_active_xx`, not an `is_current=true` row.
+
 `core_active_xx` only stores certificates that still remain in the primary set.
 
 - The table does not represent `ACTIVE` / `REVOKED` / `EXPIRED` state.
 - The table does not represent `hot` / `warm` / `stale` tiers.
 - The same `subjectId` may keep multiple certificates in the primary set at the same time.
-- Only the latest successfully issued certificate is marked with `is_current = true`.
-- Older certificates with `is_current = false` are still considered usable while they remain in the primary set.
-- In the current mock issuance phase, `not_after` is sourced from `certificate_issue_fact.not_after`.
+- The default query now returns the latest record in the primary set for the subject.
+- `not_after` is sourced from real issuance results written into `certificate_issue_fact`.
 - Manual revoke removes the certificate from `core_active_xx`, writes `revocation_current`, and appends a `REVOKE` event to `revocation_outbox`.
 - Manual recover removes the `revocation_current` row, writes the certificate back to `core_active_xx`, and appends a `RECOVER` event to `revocation_outbox`.
 - The legacy `POST /certificates/{certSerial}/revoke` and `POST /certificates/{certSerial}/recover` interfaces are deprecated because they depend on locator-based routing.

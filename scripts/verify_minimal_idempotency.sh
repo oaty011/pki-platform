@@ -23,7 +23,7 @@ Expected: same requestId/status returned; issue_fact only one row for requestId=
 [2] Same requestId repeated sync-core-active
 curl -s -X POST "$BASE_URL/certificates/sync-core-active/$REQUEST_ID_1"
 curl -s -X POST "$BASE_URL/certificates/sync-core-active/$REQUEST_ID_1"
-Expected: both succeed; core_active has only one current row for subjectId=$SUBJECT_ID.
+Expected: both succeed; default query returns the latest active certificate for subjectId=$SUBJECT_ID.
 
 [3] Same subjectId with different requestId issued twice
 curl -s -X POST "$BASE_URL/app-certificates/apply" \
@@ -31,7 +31,7 @@ curl -s -X POST "$BASE_URL/app-certificates/apply" \
   -d '{"requestId":"'$REQUEST_ID_2'","templateId":"'$TEMPLATE_ID'","appId":"'$SUBJECT_ID'"}'
 
 curl -s -X POST "$BASE_URL/certificates/sync-core-active/$REQUEST_ID_2"
-Expected: newest certificate becomes current; old core_active row switches to is_current=false.
+Expected: newest certificate becomes the default latest active result for subjectId=$SUBJECT_ID.
 
 [4] Optional SQL checks
 psql -U $DB_USER -d $DB_NAME <<'SQL'
@@ -41,7 +41,7 @@ WHERE request_id IN ('$REQUEST_ID_1', '$REQUEST_ID_2')
 GROUP BY request_id;
 
 -- Replace core_active_xx with the shard table resolved by PartitionService for subjectId=$SUBJECT_ID.
-SELECT cert_serial, issuer_id, subject_id, is_current, updated_at
+SELECT cert_serial, issuer_id, subject_id, updated_at
 FROM pki_app.core_active_xx
 WHERE subject_id = '$SUBJECT_ID'
 ORDER BY updated_at DESC;
@@ -49,5 +49,5 @@ SQL
 
 Expected SQL results:
 - issue_fact: each requestId count = 1
-- core_active shard table: only one row with is_current=true for subjectId=$SUBJECT_ID
+- core_active shard table: rows remain stable for subjectId=$SUBJECT_ID, and default query should return the latest active record
 MSG

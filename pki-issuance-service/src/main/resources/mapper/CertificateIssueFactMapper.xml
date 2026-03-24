@@ -78,6 +78,26 @@
           AND sync_status = #{syncStatus}
     </select>
 
+    <select id="selectRequestIdsForSyncCompensation" resultType="string">
+        SELECT request_id
+        FROM pki_issuance.certificate_issue_fact
+        WHERE status = #{status}
+          AND sync_status IN (#{pendingStatus}, #{failedStatus})
+        ORDER BY updated_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteExpiredIssueFacts">
+        DELETE FROM pki_issuance.certificate_issue_fact
+        WHERE id IN (
+            SELECT id
+            FROM pki_issuance.certificate_issue_fact
+            WHERE created_at &lt; #{cutoff}
+            ORDER BY created_at ASC, id ASC
+            LIMIT #{batchSize}
+        )
+    </delete>
+
     <update id="updateSyncStatusByRequestId">
         UPDATE pki_issuance.certificate_issue_fact
         SET sync_status = #{syncStatus},
