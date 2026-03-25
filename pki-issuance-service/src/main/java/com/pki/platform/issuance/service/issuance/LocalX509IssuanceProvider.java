@@ -1,12 +1,12 @@
 package com.pki.platform.issuance.service.issuance;
 
+import com.pki.platform.common.enums.ErrorCode;
+import com.pki.platform.common.exception.BizException;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
@@ -110,6 +110,8 @@ public class LocalX509IssuanceProvider implements CertificateIssuanceProvider {
                 toPem(certificate),
                 notAfter
             );
+        } catch (BizException ex) {
+            throw ex;
         } catch (Exception ex) {
             throw new IllegalStateException("failed to issue local X.509 certificate", ex);
         }
@@ -124,7 +126,10 @@ public class LocalX509IssuanceProvider implements CertificateIssuanceProvider {
     }
 
     public OffsetDateTime resolveNotAfter(CertificateIssuanceCommand command) {
-        return command.getNotAfter() == null ? OffsetDateTime.now().plusDays(90) : command.getNotAfter();
+        if (command.getNotAfter() == null) {
+            throw new IllegalArgumentException("notAfter must be provided by the template-driven issuance command");
+        }
+        return command.getNotAfter();
     }
 
     public String resolveSignatureAlgorithm() {
@@ -133,24 +138,25 @@ public class LocalX509IssuanceProvider implements CertificateIssuanceProvider {
 
     private SubjectMaterial resolveSubjectMaterial(CertificateIssuanceCommand command)
         throws IOException, GeneralSecurityException, OperatorCreationException, PKCSException {
-        if (!isBlank(command.getCsrPem())) {
-            PKCS10CertificationRequest certificationRequest = parseCsr(command.getCsrPem());
-            JcaPKCS10CertificationRequest jcaRequest = new JcaPKCS10CertificationRequest(certificationRequest).setProvider(BC_PROVIDER);
-            if (!certificationRequest.isSignatureValid(
-                new JcaContentVerifierProviderBuilder().setProvider(BC_PROVIDER).build(jcaRequest.getPublicKey()))) {
-                throw new IllegalArgumentException("csr self-signature is invalid");
-            }
-            PublicKey publicKey = jcaRequest.getPublicKey();
-            X500Name subjectName = buildSubjectName(command);
-            return new SubjectMaterial(publicKey, subjectName);
+        if (isBlank(command.getCsrPem())) {
+            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "csr is required");
         }
 
-        // Transitional fallback for the first version: if no CSR is provided yet,
-        // generate an ephemeral keypair to unblock the real issuance chain.
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(resolveKeyAlgorithm(command));
-        keyPairGenerator.initialize(2048);
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        return new SubjectMaterial(keyPair.getPublic(), buildSubjectName(command));
+        try {
+            PKCS10CertificationRequest certificationRequest = parseCsr(command.getCsrPem());
+            JcaPKCS10CertificationRequest jcaRequest = new JcaPKCS10CertificationRequest(certificationRequest).setProvider(BC_PROVIDER);
+            PublicKey publicKey = jcaRequest.getPublicKey();
+            if (!certificationRequest.isSignatureValid(
+                new JcaContentVerifierProviderBuilder().setProvider(BC_PROVIDER).build(publicKey))) {
+                throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "csr signature verification failed");
+            }
+            X500Name subjectName = buildSubjectName(command);
+            return new SubjectMaterial(publicKey, subjectName);
+        } catch (BizException ex) {
+            throw ex;
+        } catch (IOException | PKCSException | OperatorCreationException | GeneralSecurityException ex) {
+            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "invalid csr format");
+        }
     }
 
     private PKCS10CertificationRequest parseCsr(String csrPem) throws IOException {
@@ -160,7 +166,7 @@ public class LocalX509IssuanceProvider implements CertificateIssuanceProvider {
                 return request;
             }
         }
-        throw new IllegalArgumentException("csr is not a valid PKCS#10 request");
+        throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "invalid csr format");
     }
 
     private X500Name buildSubjectName(CertificateIssuanceCommand command) {

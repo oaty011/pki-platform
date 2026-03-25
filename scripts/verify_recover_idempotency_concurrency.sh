@@ -13,7 +13,7 @@ APP_ID="${APP_ID:-recover-concurrency-$(date +%s)}"
 REQUEST_ID_PREFIX="${REQUEST_ID_PREFIX:-recover-concurrency}"
 CONCURRENCY="${CONCURRENCY:-5}"
 
-REQUEST_ID="${REQUEST_ID_PREFIX}-$(date +%Y%m%d%H%M%S)"
+REQUEST_ID="${APP_TEMPLATE_ID}:${APP_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

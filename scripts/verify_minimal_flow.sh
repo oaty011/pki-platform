@@ -2,13 +2,13 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:18081}"
-REQUEST_ID_APP="${REQUEST_ID_APP:-app-req-001}"
-REQUEST_ID_APP_2="${REQUEST_ID_APP_2:-app-req-002}"
-REQUEST_ID_ECU="${REQUEST_ID_ECU:-ecu-req-001}"
 APP_ID="${APP_ID:-app-demo-001}"
 DEVICE_ID="${DEVICE_ID:-ecu-demo-001}"
 APP_TEMPLATE_ID="${APP_TEMPLATE_ID:-app-template-demo}"
 ECU_TEMPLATE_ID="${ECU_TEMPLATE_ID:-ecu-template-demo}"
+REQUEST_ID_APP="${REQUEST_ID_APP:-${APP_TEMPLATE_ID}:${APP_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')}"
+REQUEST_ID_APP_2="${REQUEST_ID_APP_2:-${APP_TEMPLATE_ID}:${APP_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')}"
+REQUEST_ID_ECU="${REQUEST_ID_ECU:-${ECU_TEMPLATE_ID}:${DEVICE_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')}"
 
 cat <<MSG
 Base URL: ${BASE_URL}

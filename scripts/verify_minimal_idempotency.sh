@@ -2,12 +2,12 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:18081}"
-REQUEST_ID_1="${REQUEST_ID_1:-app-idem-001}"
-REQUEST_ID_2="${REQUEST_ID_2:-app-idem-002}"
 SUBJECT_ID="${SUBJECT_ID:-app-demo-001}"
 TEMPLATE_ID="${TEMPLATE_ID:-app-template-basic}"
 DB_NAME="${DB_NAME:-pki_platform}"
 DB_USER="${DB_USER:-postgres}"
+REQUEST_ID_1="${REQUEST_ID_1:-${TEMPLATE_ID}:${SUBJECT_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')}"
+REQUEST_ID_2="${REQUEST_ID_2:-${TEMPLATE_ID}:${SUBJECT_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')}"
 
 cat <<MSG
 [1] Same requestId repeated apply

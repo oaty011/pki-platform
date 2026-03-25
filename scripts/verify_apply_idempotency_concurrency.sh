@@ -12,7 +12,7 @@ APP_ID="${APP_ID:-apply-concurrency-$(date +%s)}"
 REQUEST_ID_PREFIX="${REQUEST_ID_PREFIX:-apply-concurrency}"
 CONCURRENCY="${CONCURRENCY:-5}"
 
-REQUEST_ID="${REQUEST_ID_PREFIX}-$(date +%Y%m%d%H%M%S)"
+REQUEST_ID="${APP_TEMPLATE_ID}:${APP_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -111,23 +111,54 @@ echo
 echo "== 2) Concurrent apply with same requestId =="
 for i in $(seq 1 "$CONCURRENCY"); do
   (
-    api_post "${BASE_URL}/app-certificates/apply" \
-      "{\"requestId\":\"${REQUEST_ID}\",\"templateId\":\"${APP_TEMPLATE_ID}\",\"appId\":\"${APP_ID}\"}" \
-      > "${TMP_DIR}/response_${i}.json"
+    HTTP_CODE="$(curl -sS -o "${TMP_DIR}/response_${i}.json" -w '%{http_code}' -X POST "${BASE_URL}/app-certificates/apply" \
+      -H 'Content-Type: application/json' \
+      -d "{\"requestId\":\"${REQUEST_ID}\",\"templateId\":\"${APP_TEMPLATE_ID}\",\"appId\":\"${APP_ID}\"}")" \
+      || HTTP_CODE="000"
+    printf '%s\n' "${HTTP_CODE}" > "${TMP_DIR}/response_${i}.http"
   ) &
 done
 wait
 
 SUCCESS_COUNT=0
+HTTP_NON_200_COUNT=0
+SUCCESS_FALSE_COUNT=0
+EMPTY_RESPONSE_COUNT=0
 for file in "${TMP_DIR}"/response_*.json; do
   echo "--- $(basename "$file") ---"
   cat "$file"
   echo
+  http_file="${file%.json}.http"
+  http_code="$(cat "$http_file" 2>/dev/null || printf '000')"
+  echo "http_code=${http_code}"
+  if [[ "$http_code" != "200" ]]; then
+    HTTP_NON_200_COUNT=$((HTTP_NON_200_COUNT + 1))
+  fi
+  if [[ ! -s "$file" ]]; then
+    EMPTY_RESPONSE_COUNT=$((EMPTY_RESPONSE_COUNT + 1))
+    continue
+  fi
   success="$(json_get "success" < "$file")"
   if [[ "$success" == "true" ]]; then
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+    status="$(json_get "data.status" < "$file")"
+    [[ "$status" == "ISSUED" ]] || fail "apply response status mismatch in $(basename "$file") (actual=$status)"
+  else
+    SUCCESS_FALSE_COUNT=$((SUCCESS_FALSE_COUNT + 1))
   fi
 done
+
+echo
+echo "== 2.1) Interface checks =="
+echo "http_non_200_count=${HTTP_NON_200_COUNT}"
+echo "success_false_count=${SUCCESS_FALSE_COUNT}"
+echo "empty_response_count=${EMPTY_RESPONSE_COUNT}"
+echo "successful_responses=${SUCCESS_COUNT}"
+
+assert_equals "0" "$HTTP_NON_200_COUNT" "concurrent apply returned non-200 responses"
+assert_equals "0" "$SUCCESS_FALSE_COUNT" "concurrent apply returned success=false responses"
+assert_equals "0" "$EMPTY_RESPONSE_COUNT" "concurrent apply returned empty responses"
+assert_equals "$CONCURRENCY" "$SUCCESS_COUNT" "concurrent apply did not return stable success for all requests"
 
 echo
 echo "== 3) SQL checks =="

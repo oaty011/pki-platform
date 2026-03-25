@@ -19,7 +19,6 @@ import com.pki.platform.issuance.template.CertificateType;
 import java.time.OffsetDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,12 +45,14 @@ public class CertificateApplicationService {
     @Transactional
     public AppCertificateApplyResponse applyAppCertificate(AppCertificateApplyRequest request) {
         validateBase(request == null ? null : request.getRequestId(), request == null ? null : request.getTemplateId());
+        validateCsr(request == null ? null : request.getCsr());
         CertificateTemplate template = certificateTemplateRegistry.getRequired(request.getTemplateId());
         ensureTemplateType(template, CertificateType.APP);
 
         String appId = normalize(request.getAppId());
         String installId = appId == null ? installIdGenerator.generate() : null;
         String subjectId = appId != null ? appId : installId;
+        warnIfRequestIdLooksNonCanonical(request.getRequestId(), template.getTemplateId(), appId);
         CertificateIssueFact issueFact = issue(request.getRequestId(), template, subjectId, request.getCsr());
         return new AppCertificateApplyResponse(issueFact.getRequestId(), issueFact.getStatus(), appId, installId);
     }
@@ -59,11 +60,13 @@ public class CertificateApplicationService {
     @Transactional
     public EcuCertificateApplyResponse applyEcuCertificate(EcuCertificateApplyRequest request) {
         validateBase(request == null ? null : request.getRequestId(), request == null ? null : request.getTemplateId());
+        validateCsr(request == null ? null : request.getCsr());
         if (request == null || isBlank(request.getDeviceId())) {
             throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "deviceId is required");
         }
         CertificateTemplate template = certificateTemplateRegistry.getRequired(request.getTemplateId());
         ensureTemplateType(template, CertificateType.ECU);
+        warnIfRequestIdLooksNonCanonical(request.getRequestId(), template.getTemplateId(), request.getDeviceId());
 
         CertificateIssueFact issueFact = issue(request.getRequestId(), template, request.getDeviceId(), request.getCsr());
         return new EcuCertificateApplyResponse(issueFact.getRequestId(), issueFact.getStatus(), request.getDeviceId());
@@ -94,19 +97,21 @@ public class CertificateApplicationService {
         record.setSyncStatus(IssueSyncStatus.PENDING.getValue());
         record.setCreatedAt(now);
         record.setUpdatedAt(now);
-        try {
-            certificateIssueFactMapper.insert(record);
+        int inserted = certificateIssueFactMapper.insert(record);
+        if (inserted == 1) {
             log.info("apply new record created requestId={}", requestId);
             return record;
-        } catch (DataIntegrityViolationException ex) {
-            CertificateIssueFact conflictRecord = certificateIssueFactMapper.selectByRequestId(requestId);
-            if (conflictRecord != null) {
-                log.info("apply idempotent hit after unique conflict requestId={}", requestId);
-                return conflictRecord;
-            }
-            throw new BizException(ErrorCode.BUSINESS_ERROR,
-                "failed to persist certificate request after unique conflict, requestId=" + requestId);
         }
+
+        CertificateIssueFact conflictRecord = certificateIssueFactMapper.selectByRequestId(requestId);
+        if (conflictRecord != null) {
+            log.info("apply idempotent hit after insert conflict requestId={}", requestId);
+            return conflictRecord;
+        }
+        throw new BizException(
+            ErrorCode.BUSINESS_ERROR,
+            "failed to persist certificate request after idempotent insert, requestId=" + requestId
+        );
     }
 
     private CertificateIssuanceCommand buildCommand(String requestId,
@@ -167,6 +172,24 @@ public class CertificateApplicationService {
     private void validateBase(String requestId, String templateId) {
         if (isBlank(requestId) || isBlank(templateId)) {
             throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "requestId and templateId are required");
+        }
+        if (requestId.length() > 128) {
+            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "requestId length must be <= 128");
+        }
+    }
+
+    private void validateCsr(String csrPem) {
+        if (isBlank(csrPem)) {
+            throw new BizException(ErrorCode.INVALID_REQUEST_PARAM, "csr is required");
+        }
+    }
+
+    private void warnIfRequestIdLooksNonCanonical(String requestId, String templateId, String clientSubjectId) {
+        if (!requestId.contains(templateId)) {
+            log.warn("requestId does not contain templateId, requestId={} templateId={}", requestId, templateId);
+        }
+        if (!isBlank(clientSubjectId) && !requestId.contains(clientSubjectId)) {
+            log.warn("requestId does not contain subjectId, requestId={} subjectId={}", requestId, clientSubjectId);
         }
     }
 

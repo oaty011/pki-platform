@@ -8,3 +8,10 @@ target/
 .idea/
 .vscode/
 *.iml
+
+.local/
+issued-app.pem
+sub-from-p12.pem
+*.key.pem
+*.csr.pem
+*.p12

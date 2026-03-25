@@ -47,6 +47,37 @@
 
 ## 3. 当前接口清单
 
+## requestId 生成规范
+
+`requestId` 由调用方生成，并作为 apply 接口的幂等键（Idempotency Key）。
+
+约束如下：
+
+- 同一业务请求重试时，必须复用同一个 `requestId`
+- 不同业务请求，必须使用不同的 `requestId`
+- `requestId` 建议携带业务域信息，避免 APP / ECU / 不同模板之间误碰撞
+
+推荐格式：
+
+`{templateId}:{subjectId}:{timestamp}:{random}`
+
+字段说明：
+
+- `templateId`
+  - 证书模板 ID，例如 `app-controller-sdk`、`ecu-tbox`
+- `subjectId`
+  - APP：推荐使用 `appId`
+  - ECU：使用 `deviceId`
+- `timestamp`
+  - 毫秒时间戳，格式：`yyyyMMddHHmmssSSS`
+- `random`
+  - 6 到 8 位随机字符串，字符集建议为 `a-z0-9`
+
+示例：
+
+- `app-controller-sdk:app-123:20260325111530123:ab12cd`
+- `ecu-tbox:device-001:20260325111530123:ff89aa`
+
 ### POST /app-certificates/apply
 
 语义：

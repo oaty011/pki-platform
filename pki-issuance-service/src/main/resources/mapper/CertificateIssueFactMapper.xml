@@ -25,12 +25,13 @@
         id, request_id, template_id, subject_id, organization, issuer_id, signer_id, cert_serial, certificate_pem, not_after, status, sync_status, created_at, updated_at
     </sql>
 
-    <insert id="insert" parameterType="com.pki.platform.issuance.model.CertificateIssueFact" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.pki.platform.issuance.model.CertificateIssueFact">
         INSERT INTO pki_issuance.certificate_issue_fact (
             request_id, template_id, subject_id, organization, issuer_id, signer_id, cert_serial, certificate_pem, not_after, status, sync_status, created_at, updated_at
         ) VALUES (
             #{requestId}, #{templateId}, #{subjectId}, #{organization}, #{issuerId}, #{signerId}, #{certSerial}, #{certificatePem}, #{notAfter}, #{status}, #{syncStatus}, #{createdAt}, #{updatedAt}
         )
+        ON CONFLICT (request_id) DO NOTHING
     </insert>
 
     <select id="selectById" resultMap="certificateIssueFactResultMap">

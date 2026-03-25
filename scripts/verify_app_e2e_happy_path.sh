@@ -11,8 +11,12 @@ PGPASSWORD="${PGPASSWORD:?PGPASSWORD is required}"
 APP_ID="${APP_ID:-app-e2e-$(date +%s)}"
 APP_TEMPLATE_ID="${APP_TEMPLATE_ID:-app-template-demo}"
 REQUEST_ID_PREFIX="${REQUEST_ID_PREFIX:-app-e2e}"
+TEST_CSR_DIR="${TEST_CSR_DIR:-.local/test-csr}"
 
-REQUEST_ID="${REQUEST_ID_PREFIX}-$(date +%Y%m%d%H%M%S)"
+REQUEST_ID="${APP_TEMPLATE_ID}:${APP_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')"
+REQUEST_ID_FILE_SAFE="${REQUEST_ID//:/_}"
+CSR_KEY_PATH="${TEST_CSR_DIR}/${REQUEST_ID_FILE_SAFE}.key.pem"
+CSR_PATH="${TEST_CSR_DIR}/${REQUEST_ID_FILE_SAFE}.csr.pem"
 APP_ORGANIZATION="DFMC"
 
 require_cmd() {
@@ -113,6 +117,9 @@ sql_scalar() {
 require_cmd curl
 require_cmd psql
 require_cmd python3
+require_cmd openssl
+
+mkdir -p "$TEST_CSR_DIR"
 
 cat <<MSG
 BASE_URL=${BASE_URL}
@@ -126,18 +133,30 @@ APP_ID=${APP_ID}
 APP_TEMPLATE_ID=${APP_TEMPLATE_ID}
 REQUEST_ID_PREFIX=${REQUEST_ID_PREFIX}
 REQUEST_ID=${REQUEST_ID}
+TEST_CSR_DIR=${TEST_CSR_DIR}
 MSG
 
 echo
-echo "== 1) APP apply =="
-APPLY_RESPONSE="$(api_post "${BASE_URL}/app-certificates/apply" "{\"requestId\":\"${REQUEST_ID}\",\"templateId\":\"${APP_TEMPLATE_ID}\",\"appId\":\"${APP_ID}\"}")"
+echo "== 1) Generate APP key and CSR =="
+openssl genrsa -out "$CSR_KEY_PATH" 2048 >/dev/null 2>&1 || fail "failed to generate APP private key"
+openssl req -new -sha256 \
+  -key "$CSR_KEY_PATH" \
+  -subj "/CN=${APP_ID}/OU=ignored-by-platform/O=ignored/C=CN" \
+  -out "$CSR_PATH" >/dev/null 2>&1 || fail "failed to generate APP CSR"
+CSR_CONTENT="$(cat "$CSR_PATH")"
+assert_non_empty "$CSR_CONTENT" "CSR content is empty"
+
+echo
+echo "== 2) APP apply =="
+APPLY_BODY="$(python3 -c 'import json,sys; print(json.dumps({"requestId": sys.argv[1], "templateId": sys.argv[2], "appId": sys.argv[3], "csr": open(sys.argv[4]).read()}))' "$REQUEST_ID" "$APP_TEMPLATE_ID" "$APP_ID" "$CSR_PATH")"
+APPLY_RESPONSE="$(api_post "${BASE_URL}/app-certificates/apply" "$APPLY_BODY")"
 printf '%s\n' "$APPLY_RESPONSE"
 assert_api_success "$APPLY_RESPONSE" "APP apply"
 assert_equals "$REQUEST_ID" "$(printf '%s' "$APPLY_RESPONSE" | json_get "data.requestId")" "requestId mismatch after apply"
 assert_equals "ISSUED" "$(printf '%s' "$APPLY_RESPONSE" | json_get "data.status")" "apply status mismatch"
 
 echo
-echo "== 2) Query certificate status by requestId =="
+echo "== 3) Query certificate status by requestId =="
 STATUS_RESPONSE="$(api_get "${BASE_URL}/certificates/${REQUEST_ID}")"
 printf '%s\n' "$STATUS_RESPONSE"
 assert_api_success "$STATUS_RESPONSE" "status query"
@@ -148,14 +167,14 @@ assert_non_empty "$ISSUER_ID" "issuerId is empty after status query"
 assert_equals "ISSUED" "$(printf '%s' "$STATUS_RESPONSE" | json_get "data.status")" "certificate status mismatch"
 
 echo
-echo "== 3) Sync core_active =="
+echo "== 4) Sync core_active =="
 SYNC_RESPONSE="$(api_post "${BASE_URL}/certificates/sync-core-active/${REQUEST_ID}" '{}')"
 printf '%s\n' "$SYNC_RESPONSE"
 assert_api_success "$SYNC_RESPONSE" "sync-core-active"
 assert_equals "done" "$(printf '%s' "$SYNC_RESPONSE" | json_get "data.syncStatus")" "sync status mismatch"
 
 echo
-echo "== 4) First APP current query =="
+echo "== 5) First APP current query =="
 CURRENT_QUERY_1="$(api_post "${BASE_URL}/app-certificates/current/query" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"\"}")"
 printf '%s\n' "$CURRENT_QUERY_1"
 assert_api_success "$CURRENT_QUERY_1" "first current query"
@@ -168,7 +187,7 @@ assert_equals "$CERT_SERIAL" "$(printf '%s' "$CURRENT_QUERY_1" | json_get "data.
 assert_equals "$ISSUER_ID" "$(printf '%s' "$CURRENT_QUERY_1" | json_get "data.currentActiveCertificate.issuerId")" "currentActiveCertificate issuerId mismatch"
 
 echo
-echo "== 5) SQL checks after sync-core-active =="
+echo "== 6) SQL checks after sync-core-active =="
 ISSUE_FACT_COUNT="$(sql_scalar "SELECT COUNT(*) FROM pki_issuance.certificate_issue_fact WHERE request_id = '$(sql_escape "$REQUEST_ID")';")"
 CORE_ACTIVE_EXISTS_AFTER_SYNC="$(sql_scalar "SELECT COUNT(*) FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
 CORE_ACTIVE_NOT_AFTER_AFTER_SYNC="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
@@ -177,14 +196,14 @@ assert_equals "1" "$CORE_ACTIVE_EXISTS_AFTER_SYNC" "core_active row missing afte
 assert_non_empty "$CORE_ACTIVE_NOT_AFTER_AFTER_SYNC" "core_active not_after is empty after sync"
 
 echo
-echo "== 6) APP revoke =="
+echo "== 7) APP revoke =="
 REVOKE_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/app-certificates/revoke" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$REVOKE_RESPONSE"
 assert_api_success "$REVOKE_RESPONSE" "APP revoke"
 assert_equals "revoked" "$(printf '%s' "$REVOKE_RESPONSE" | json_get "data.action")" "revoke action mismatch"
 
 echo
-echo "== 7) SQL checks after revoke =="
+echo "== 8) SQL checks after revoke =="
 CORE_ACTIVE_EXISTS_AFTER_REVOKE="$(sql_scalar "SELECT COUNT(*) FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
 REVOCATION_CURRENT_AFTER_REVOKE="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_current WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
 OUTBOX_REVOKE_COUNT="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'REVOKE';")"
@@ -193,14 +212,14 @@ assert_equals "1" "$REVOCATION_CURRENT_AFTER_REVOKE" "revocation_current row mis
 assert_equals "1" "$OUTBOX_REVOKE_COUNT" "REVOKE outbox count mismatch"
 
 echo
-echo "== 8) APP recover =="
+echo "== 9) APP recover =="
 RECOVER_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/app-certificates/recover" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$RECOVER_RESPONSE"
 assert_api_success "$RECOVER_RESPONSE" "APP recover"
 assert_equals "recovered" "$(printf '%s' "$RECOVER_RESPONSE" | json_get "data.action")" "recover action mismatch"
 
 echo
-echo "== 9) SQL checks after recover =="
+echo "== 10) SQL checks after recover =="
 CORE_ACTIVE_EXISTS_AFTER_RECOVER="$(sql_scalar "SELECT COUNT(*) FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")';")"
 CORE_ACTIVE_NOT_AFTER_AFTER_RECOVER="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_app.${CORE_ACTIVE_TABLE} WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' LIMIT 1;")"
 ISSUE_FACT_NOT_AFTER="$(sql_scalar "SELECT COALESCE(CAST(not_after AS text), '') FROM pki_issuance.certificate_issue_fact WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' ORDER BY created_at DESC LIMIT 1;")"
@@ -215,7 +234,7 @@ assert_equals "0" "$REVOCATION_CURRENT_AFTER_RECOVER" "revocation_current row st
 assert_equals "1" "$OUTBOX_RECOVER_COUNT" "RECOVER outbox count mismatch"
 
 echo
-echo "== 10) Second APP current query =="
+echo "== 11) Second APP current query =="
 CURRENT_QUERY_2="$(api_post "${BASE_URL}/app-certificates/current/query" "{\"appId\":\"${APP_ID}\",\"installId\":\"\",\"certSerial\":\"\"}")"
 printf '%s\n' "$CURRENT_QUERY_2"
 assert_api_success "$CURRENT_QUERY_2" "second current query"

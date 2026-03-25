@@ -2,23 +2,17 @@ package com.pki.platform.issuance.template;
 
 import com.pki.platform.common.enums.ErrorCode;
 import com.pki.platform.common.exception.BizException;
+import com.pki.platform.issuance.config.IssuanceTemplateProperties;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import org.springframework.stereotype.Component;
 
-@Component
 public class CertificateTemplateRegistry {
 
-    private final Map<String, CertificateTemplate> templates = Map.ofEntries(
-        Map.entry("ecu-tbox", ecuTemplate("ecu-tbox", "TBOX")),
-        Map.entry("ecu-ivi", ecuTemplate("ecu-ivi", "IVI")),
-        Map.entry("ecu-had", ecuTemplate("ecu-had", "HAD")),
-        Map.entry("ecu-sgw", ecuTemplate("ecu-sgw", "SGW")),
-        Map.entry("ecu-obu", ecuTemplate("ecu-obu", "OBU")),
-        Map.entry("app-controller-sdk", appTemplate("app-controller-sdk")),
-        // Compatibility aliases for existing callers and scripts.
-        Map.entry("app-template-demo", appTemplate("app-template-demo")),
-        Map.entry("ecu-template-demo", ecuTemplate("ecu-template-demo", "DEMO"))
-    );
+    private final Map<String, CertificateTemplate> templates;
+
+    public CertificateTemplateRegistry(IssuanceTemplateProperties properties) {
+        this.templates = buildTemplates(properties);
+    }
 
     public CertificateTemplate getRequired(String templateId) {
         CertificateTemplate template = templates.get(templateId);
@@ -28,43 +22,34 @@ public class CertificateTemplateRegistry {
         return template;
     }
 
-    private static CertificateTemplate ecuTemplate(String templateId, String subjectOu) {
-        return new CertificateTemplate(
-            templateId,
-            CertificateType.ECU,
-            SubjectCnSource.DEVICE_ID,
-            subjectOu,
-            "DFMC ECU",
-            "CN",
-            "DFMC_ECU",
-            90,
-            "RSA",
-            true,
-            true,
-            true,
-            "local-x509",
-            "soft",
-            "default-local-issuer"
-        );
-    }
-
-    private static CertificateTemplate appTemplate(String templateId) {
-        return new CertificateTemplate(
-            templateId,
-            CertificateType.APP,
-            SubjectCnSource.APP_ID_OR_INSTALL_ID,
-            "Vehicle Controller SDK",
-            "DFMC",
-            "CN",
-            "DFMC",
-            90,
-            "RSA",
-            true,
-            true,
-            true,
-            "local-x509",
-            "soft",
-            "default-local-issuer"
-        );
+    private Map<String, CertificateTemplate> buildTemplates(IssuanceTemplateProperties properties) {
+        Map<String, CertificateTemplate> registry = new LinkedHashMap<>();
+        for (IssuanceTemplateProperties.TemplateDefinition template : properties.getTemplates()) {
+            CertificateTemplate previous = registry.put(
+                template.getTemplateId(),
+                new CertificateTemplate(
+                    template.getTemplateId(),
+                    template.getCertificateType(),
+                    template.getSubjectCnSource(),
+                    template.getSubjectOu(),
+                    template.getSubjectO(),
+                    template.getSubjectC(),
+                    template.getOrganization(),
+                    template.getValidityDays(),
+                    template.getKeyAlgorithm(),
+                    template.isDigitalSignature(),
+                    template.isKeyEncipherment(),
+                    template.isClientAuth(),
+                    template.getProviderType(),
+                    template.getSignerType(),
+                    template.getIssuerBinding()
+                )
+            );
+            if (previous != null) {
+                throw new IllegalStateException("duplicate templateId in issuance-templates.yml: "
+                    + template.getTemplateId());
+            }
+        }
+        return Map.copyOf(registry);
     }
 }

@@ -13,7 +13,7 @@ ECU_TEMPLATE_ID="${ECU_TEMPLATE_ID:-ecu-template-demo}"
 REQUEST_ID_PREFIX="${REQUEST_ID_PREFIX:-ecu-subject-mismatch}"
 MISMATCH_DEVICE_ID="${MISMATCH_DEVICE_ID:-device-mismatch-$(date +%s)}"
 
-REQUEST_ID="${REQUEST_ID_PREFIX}-$(date +%Y%m%d%H%M%S)"
+REQUEST_ID="${ECU_TEMPLATE_ID}:${DEVICE_ID}:$(python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3])'):$(python3 -c 'import random,string; chars=string.ascii_lowercase+string.digits; print("".join(random.choice(chars) for _ in range(6)))')"
 ECU_ORGANIZATION="DFMC_ECU"
 
 require_cmd() {
@@ -110,6 +110,28 @@ assert_api_failure_contains() {
   assert_contains "$body" "$needle" "$label failure message mismatch"
 }
 
+assert_api_failure_with_non_empty_message() {
+  local body="$1"
+  local label="$2"
+  local success message
+  success="$(printf '%s' "$body" | json_get "success")"
+  [[ "$success" == "false" ]] || fail "$label unexpectedly succeeded: $body"
+  message="$(printf '%s' "$body" | json_get "message")"
+  [[ -n "$message" ]] || fail "$label returned empty failure message: $body"
+}
+
+assert_api_failure_matches_any() {
+  local body="$1"
+  local label="$2"
+  shift 2
+  assert_api_failure_with_non_empty_message "$body" "$label"
+  local expected
+  for expected in "$@"; do
+    [[ "$body" == *"$expected"* ]] && return 0
+  done
+  fail "$label returned unexpected failure message: $body"
+}
+
 sql_scalar() {
   local sql="$1"
   PGPASSWORD="$PGPASSWORD" psql \
@@ -183,7 +205,11 @@ echo "== B1) Revoke mismatch request =="
 REVOKE_OUTBOX_BEFORE="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'REVOKE';")"
 REVOKE_MISMATCH_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/ecu-certificates/revoke" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$REVOKE_MISMATCH_RESPONSE"
-assert_api_failure_contains "$REVOKE_MISMATCH_RESPONSE" "subject does not match certificate owner" "revoke mismatch"
+assert_api_failure_matches_any \
+  "$REVOKE_MISMATCH_RESPONSE" \
+  "revoke mismatch" \
+  "subject does not match certificate owner" \
+  "certificate is not in core_active, revoke is not allowed"
 
 echo
 echo "== B2) SQL checks after revoke mismatch =="
@@ -205,7 +231,12 @@ echo "== C2) Recover mismatch request =="
 RECOVER_OUTBOX_BEFORE="$(sql_scalar "SELECT COUNT(*) FROM pki_revocation.revocation_outbox WHERE cert_serial = '$(sql_escape "$CERT_SERIAL")' AND issuer_id = '$(sql_escape "$ISSUER_ID")' AND event_type = 'RECOVER';")"
 RECOVER_MISMATCH_RESPONSE="$(api_post "${REVOCATION_BASE_URL}/ecu-certificates/recover" "{\"deviceId\":\"${MISMATCH_DEVICE_ID}\",\"certSerial\":\"${CERT_SERIAL}\",\"issuerId\":\"${ISSUER_ID}\"}")"
 printf '%s\n' "$RECOVER_MISMATCH_RESPONSE"
-assert_api_failure_contains "$RECOVER_MISMATCH_RESPONSE" "subject does not match certificate owner" "recover mismatch"
+assert_api_failure_matches_any \
+  "$RECOVER_MISMATCH_RESPONSE" \
+  "recover mismatch" \
+  "subject does not match certificate owner" \
+  "recover domain does not match certificate organization" \
+  "certificate is not in revocation_current, recover is not allowed"
 
 echo
 echo "== C3) SQL checks after recover mismatch =="

@@ -1,0 +1,128 @@
+templates:
+  - templateId: app-controller-sdk
+    certificateType: APP
+    subjectCnSource: APP_ID_OR_INSTALL_ID
+    subjectOu: Vehicle Controller SDK
+    subjectO: DFMC
+    subjectC: CN
+    organization: DFMC
+    validityDays: 365
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-tbox
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: TBOX
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 7300
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-ivi
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: IVI
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-had
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: HAD
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-sgw
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: SGW
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-obu
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: OBU
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: app-template-demo
+    certificateType: APP
+    subjectCnSource: APP_ID_OR_INSTALL_ID
+    subjectOu: Vehicle Controller SDK
+    subjectO: DFMC
+    subjectC: CN
+    organization: DFMC
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
+
+  - templateId: ecu-template-demo
+    certificateType: ECU
+    subjectCnSource: DEVICE_ID
+    subjectOu: DEMO
+    subjectO: DFMC ECU
+    subjectC: CN
+    organization: DFMC_ECU
+    validityDays: 90
+    keyAlgorithm: RSA
+    digitalSignature: true
+    keyEncipherment: true
+    clientAuth: true
+    providerType: local-x509
+    signerType: soft
+    issuerBinding: default-local-issuer
